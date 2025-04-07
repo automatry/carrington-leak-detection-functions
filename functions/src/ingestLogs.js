@@ -1,16 +1,18 @@
 const functions = require("firebase-functions");
+const { onRequest } = require("firebase-functions/v2/https");
 const { BigQuery } = require("@google-cloud/bigquery");
 require("dotenv").config();
 
 const FORCE_NO_TOKEN_CHECK = process.env.FORCE_NO_TOKEN_CHECK === "true";
 const ACCESS_TOKEN = process.env.DEVICE_UPDATE_TOKEN ||
-                     process.env.FUNCTIONS_CONFIG_DEVICE_UPDATETOKEN;
+ functions.config().device.updatetoken;
+
 
 const DATASET_ID = process.env.BQ_DATASET_ID || "leak_detection";
 const TABLE_ID = process.env.BQ_TABLE_ID || "device_logs";
 const bigquery = new BigQuery();
 
-exports.ingestLogs = functions.https.onRequest(async (req, res) => {
+exports.ingestLogs = onRequest(async (req, res) => {
   try {
     // Only allow POST requests.
     if (req.method !== "POST") {

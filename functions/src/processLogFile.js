@@ -1,43 +1,41 @@
-const functions = require("firebase-functions");
-const admin = require("../../firebase");
-const { BigQuery } = require("@google-cloud/bigquery");
+const { onObjectFinalized } = require("firebase-functions/v2/storage");
+const { storage, bigquery } = require("../firebase");
+const logger = require("firebase-functions/logger");
+require("dotenv").config();
 
-// BigQuery settings – use environment variables if needed.
 const DATASET_ID = process.env.BQ_DATASET_ID || "leak_detection";
 const TABLE_ID = process.env.BQ_TABLE_ID || "device_logs";
-const bigquery = new BigQuery();
 
-// This function triggers when a new object is finalized in Cloud Storage.
-exports.processLogFile =
-functions.storage.object().onFinalize(async (object) => {
-  const bucketName = object.bucket;
-  const filePath = object.name;
-  const contentType = object.contentType;
-  console.log(`Processing file ${filePath} from 
-    bucket ${bucketName} with content type ${contentType}`);
+exports.processLogFile = onObjectFinalized({
+  region: "europe-west1", cpu: 2 }
+, async (event) => {
+  const fileBucket = event.data.bucket; // Bucket name as passed by the event
+  const filePath = event.data.name;
+  const contentType = event.data.contentType;
+  logger.info(`Processing file ${filePath} from 
+    bucket ${fileBucket} with content type ${contentType}`);
 
-  // Only process JSON files.
   if (!filePath.endsWith(".json")) {
-    console.log(`File ${filePath} is not a JSON file; skipping.`);
+    logger.info(`File ${filePath} is not a JSON file; skipping.`);
     return null;
   }
 
-  // Get a reference to the file from Cloud Storage.
-  const bucket = admin.storage().bucket(bucketName);
-  const file = bucket.file(filePath);
+  // Since we already initialized storage with
+  // the default bucket, we can use it directly.
+  // (Alternatively, if you need to override, use:
+  // storage.bucket('your-bucket-name'))
+  const file = storage.file(filePath);
 
   try {
-    // Download file contents as a string.
     const [contents] = await file.download();
     const logs = JSON.parse(contents.toString());
 
-    // Verify that logs is an array.
     if (!Array.isArray(logs)) {
-      console.error("Expected logs to be an array.");
+      logger.error("Expected logs to be an array.");
       return null;
     }
 
-    // Map each log entry to a row for BigQuery.
+    // Map each log entry to a BigQuery row.
     const rows = logs.map((log) => ({
       timestamp: log.timestamp ?
         new Date(log.timestamp).toISOString() :
@@ -48,22 +46,22 @@ functions.storage.object().onFinalize(async (object) => {
       bacnet_object: log.bacnet_object || "",
       event_type: log.event_type || "",
       value: log.value != null ? log.value.toString() : "",
-      // Ensure the apartment ID is lowercase if provided.
+      // Ensure the apartment_id is lowercase.
       apartment_id: log.apartment_id ? log.apartment_id.toLowerCase() : "",
       extra: log.extra ? JSON.stringify(log.extra) : "",
     }));
 
-    console.log(`Inserting ${rows.length} rows into 
+    logger.info(`Inserting ${rows.length} rows into 
         BigQuery table ${DATASET_ID}.${TABLE_ID}...`);
     await bigquery.dataset(DATASET_ID).table(TABLE_ID).insert(rows);
-    console.log("Rows successfully inserted into BigQuery.");
+    logger.info("Rows successfully inserted into BigQuery.");
 
-    // Optionally, you might want to delete the file after processing:
+    // Optionally, delete the file after processing:
     // await file.delete();
 
     return null;
   } catch (error) {
-    console.error("Error processing log file:", error);
+    logger.error("Error processing log file:", error);
     throw new Error(error);
   }
 });

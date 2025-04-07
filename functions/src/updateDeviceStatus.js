@@ -1,18 +1,16 @@
-const admin = require("../../firebase"); // Import the central admin instance
 const { FieldValue } = require("firebase-admin/firestore");
+const { db } = require("../firebase");
+require("dotenv").config();
 
 const FORCE_NO_TOKEN_CHECK = process.env.FORCE_NO_TOKEN_CHECK === "true";
 const ACCESS_TOKEN = process.env.DEVICE_UPDATE_TOKEN ||
-                     process.env.FUNCTIONS_CONFIG_DEVICE_UPDATETOKEN;
+ process.env.FUNCTIONS_CONFIG_DEVICE_UPDATETOKEN;
 
 exports.updateDeviceStatus = async (req, res) => {
   try {
-    // Only allow POST requests.
     if (req.method !== "POST") {
       return res.status(405).send("Method Not Allowed");
     }
-
-    // Token check (bypass if FORCE_NO_TOKEN_CHECK is true)
     if (!FORCE_NO_TOKEN_CHECK) {
       const token = req.body.token || req.headers.authorization;
       if (!token || token !== ACCESS_TOKEN) {
@@ -27,10 +25,8 @@ exports.updateDeviceStatus = async (req, res) => {
       return res.status(400).send("Bad Request: Missing required parameters.");
     }
 
-    const db = admin.firestore();
     const apartmentRef = db.collection("apartments").doc(apartment);
 
-    // Update the main document.
     await apartmentRef.set(
       {
         status,
@@ -40,7 +36,6 @@ exports.updateDeviceStatus = async (req, res) => {
       { merge: true },
     );
 
-    // If configuration provided, store it in a subcollection.
     if (config) {
       const configRef = apartmentRef.collection("deviceConfig").doc("current");
       await configRef.set(

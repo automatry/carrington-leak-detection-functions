@@ -9,11 +9,13 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "*.local",
-        ".env"
+        ".env",
+        "client"
       ],
       "predeploy": [
         "npm --prefix \"$RESOURCE_DIR\" run lint"
-      ]
+      ],
+      "defaultRegion": "europe-west1"
     }
   ],
   "hosting": {
@@ -23,5 +25,8 @@
       "**/.*",
       "**/node_modules/**"
     ]
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }

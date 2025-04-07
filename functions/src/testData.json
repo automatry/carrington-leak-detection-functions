@@ -1,0 +1,13 @@
+[
+  {
+    "timestamp": "2025-04-06T18:00:00Z",
+    "apartment": "001 - X",
+    "device_ip": "2:50",
+    "bacnet_device_id": "device,50",
+    "bacnet_object": "binaryInput 1",
+    "event_type": "status",
+    "value": "inactive",
+    "apartment_id": "RandomID1234",
+    "extra": { "detail": "example log" }
+  }
+]
