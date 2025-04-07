@@ -3,6 +3,7 @@ const logger = require("firebase-functions/logger");
 const { updateDeviceStatus } = require("./src/updateDeviceStatus");
 const { ingestLogs } = require("./src/ingestLogs");
 const { processLogFile } = require("./src/processLogFile");
+const { notifyStatusChange } = require("./src/notifyStatusChange");
 
 // Deploy all HTTP functions to europe-west1.
 exports.updateDeviceStatus = onRequest({
@@ -23,3 +24,6 @@ exports.ingestLogs = onRequest({
 exports.processLogFile = processLogFile;
 // processLogFile itself should be set with { region: "europe-west1", ... }
 logger.info("Functions loaded: updateDeviceStatus, ingestLogs, processLogFile");
+
+exports.notifyStatusChange = notifyStatusChange;
+
