@@ -1,0 +1,60 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  text-align: center;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.button {
+  background-color: #007bff;
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.button:hover {
+  background-color: #0056b3;
+}
+
+.userInfo {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.apartmentList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+.apartmentCard {
+  background-color: #0c5896;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: left;
+}
+
+.active {
+  color: green;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.inactive {
+  color: red;
+  font-weight: bold;
+  font-size: 1.2rem;
+}

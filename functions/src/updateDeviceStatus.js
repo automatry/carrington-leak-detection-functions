@@ -1,8 +1,4 @@
-const admin = require("firebase-admin");
-require("dotenv").config();
-admin.initializeApp();
-
-// Import FieldValue from firebase-admin/firestore if available
+const admin = require("../../firebase"); // Import the central admin instance
 const { FieldValue } = require("firebase-admin/firestore");
 
 const FORCE_NO_TOKEN_CHECK = process.env.FORCE_NO_TOKEN_CHECK === "true";
@@ -16,7 +12,7 @@ exports.updateDeviceStatus = async (req, res) => {
       return res.status(405).send("Method Not Allowed");
     }
 
-    // Validate token unless bypassed.
+    // Token check (bypass if FORCE_NO_TOKEN_CHECK is true)
     if (!FORCE_NO_TOKEN_CHECK) {
       const token = req.body.token || req.headers.authorization;
       if (!token || token !== ACCESS_TOKEN) {
@@ -44,7 +40,7 @@ exports.updateDeviceStatus = async (req, res) => {
       { merge: true },
     );
 
-    // If configuration is provided, store it in a subcollection.
+    // If configuration provided, store it in a subcollection.
     if (config) {
       const configRef = apartmentRef.collection("deviceConfig").doc("current");
       await configRef.set(
