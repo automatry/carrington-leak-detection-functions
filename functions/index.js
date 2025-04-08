@@ -22,8 +22,11 @@ exports.ingestLogs = onRequest({
 
 // For the storage trigger, ensure the trigger is set to europe-west1 as well.
 exports.processLogFile = processLogFile;
-// processLogFile itself should be set with { region: "europe-west1", ... }
-logger.info("Functions loaded: updateDeviceStatus, ingestLogs, processLogFile");
 
 exports.notifyStatusChange = notifyStatusChange;
+
+// processLogFile itself should be set with { region: "europe-west1", ... }
+logger.info(`Functions loaded: updateDeviceStatus, 
+  ingestLogs, processLogFile, notifyStatusChange`);
+
 

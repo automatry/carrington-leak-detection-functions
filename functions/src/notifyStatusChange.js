@@ -1,121 +1,126 @@
-/* eslint-disable valid-jsdoc */
-const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
+// functions/notifyFromNotification.js
+const { onDocumentCreated } =
+  require("firebase-functions/v2/firestore");
+const { defineSecret } = require("firebase-functions/params");
+const sgMail = require("@sendgrid/mail");
 const logger = require("firebase-functions/logger");
-const nodemailer = require("nodemailer");
-require("dotenv").config();
+const { db } = require("../firebase");
+const { renderNotificationHTML } = require("./emailTemplates");
 
-// Recipients for email notifications.
-const EMAIL_RECIPIENTS = ["support@automatry.com"];
+const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
 
-/**
- * Sends an email notification.
- *
- * @param {string[]} recipients - Email addresses.
- * @param {string} subject - Email subject.
- * @param {string} message - Email body.
- * @return {Promise<void>}
- */
-async function sendEmailNotification(recipients, subject, message) {
-  logger.info("Sending email to: %s", recipients);
-  logger.info("Subject: %s", subject);
-  logger.info("Message:\n%s", message);
+const FROM_EMAIL_DOC = "config/email";
+const RECIPIENTS_DOC = "recipients/recipients";
 
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: recipients.join(","),
-    // Add BCC for support
-    bcc: "support@automatry.com",
-    subject: subject,
-    text: message,
-  };
-
-  await transporter.sendMail(mailOptions);
-}
-
-/**
- * Sends an SMS notification (placeholder).
- *
- * @param {string} message - The SMS message.
- * @return {Promise<void>}
- */
-async function sendSMSNotification(message) {
-  logger.info("Sending SMS: %s", message);
-  // TODO: Integrate with an SMS API (e.g., Twilio) as needed.
-}
-
-/**
- * Cloud Function triggered on any update to the "apartments"
- * collection. It processes update events only (where both before and
- * after snapshots exist) and triggers when the "status" or
- * "service_status" fields change.
- *
- * @return {Promise<void>}
- */
-exports.notifyStatusChange = onDocumentUpdated(
+exports.notifyStatusChange = onDocumentCreated(
   {
-    document: "apartments/{apartmentId}",
+    document: "notifications/{notificationId}",
     region: "europe-west1",
+    secrets: [sendgridApiKey],
   },
   async (event) => {
+    const docId = event.params.notificationId;
+    const notificationRef = db.doc(`notifications/${docId}`);
+    const updateData = {
+      status: "processing",
+      sentAt: new Date(),
+    };
+
     try {
-      if (!event.data || !event.data.before || !event.data.after) {
-        logger.error("Incomplete event data: %s", event.data);
-        return;
-      }
-      // Only process update events.
-      if (!event.data.before.exists || !event.data.after.exists) {
-        logger.info("Skipping create or delete event.");
-        return;
+      const notification = event.data.data();
+      if (!notification) {
+        throw new Error("Notification document is empty.");
       }
 
-      const beforeData = event.data.before.data();
-      const afterData = event.data.after.data();
+      const isLocal = process.env.NODE_ENV === "development";
+      const apiKey = isLocal ? process.env.SENDGRID_API_KEY :
+        sendgridApiKey.value();
 
-      if (
-        beforeData.status === afterData.status &&
-        beforeData.service_status === afterData.service_status
-      ) {
-        logger.info("No change in status; skipping.");
-        return;
+      sgMail.setApiKey(apiKey);
+
+      const recipientsSnap = await db.doc(RECIPIENTS_DOC).get();
+      if (!recipientsSnap.exists) {
+        throw new Error("Recipients document not found in Firestore.");
       }
 
-      const subject = `Status Alert for Apartment ${afterData.APARTMENT}`;
-      let msg = `Apartment: ${afterData.APARTMENT}\n`;
-      msg += `Apartment ID: ${afterData.APARTMENT_ID}\n`;
-      msg += `Leak Status: ${afterData.status}\n`;
-      msg += `Service Status: ${afterData.service_status}\n`;
-      msg += "HEY BUDDY!!";
+      const recipients = recipientsSnap.data();
+      const emailList = Array.isArray(recipients.emails) ?
+        recipients.emails : [];
 
-      /**
-       * Formats a Firestore Timestamp to ISO string.
-       * @param {*} ts
-       * @return {string}
-       */
-      const formatTs = (ts) =>
-        ts && ts.toDate ? ts.toDate().toISOString() : ts || "N/A";
+      const to = emailList
+        .filter((r) => {
+          return !r.copy_type || r.copy_type.toLowerCase() === "none";
+        })
+        .map((r) => {
+          return r.email_address;
+        });
 
-      msg += `Last Update: ${formatTs(afterData.lastUpdate)}\n`;
-      msg += `Initiated At: ${formatTs(afterData.initiatedAt)}\n`;
-      msg += `Device IP: ${afterData.deviceIP || "N/A"}\n`;
+      const cc = emailList
+        .filter((r) => {
+          return r.copy_type && r.copy_type.toLowerCase() === "cc";
+        })
+        .map((r) => {
+          return r.email_address;
+        });
 
-      if (afterData.error) {
-        msg += `Error: ${afterData.error}\n`;
+      const bcc = emailList
+        .filter((r) => {
+          return r.copy_type && r.copy_type.toLowerCase() === "bcc";
+        })
+        .map((r) => {
+          return r.email_address;
+        });
+
+      // fallback to configured fallback TO address, not BCCs
+      if (to.length === 0) {
+        const fallbackEmail = recipients.fallback_to ||
+          "support@automatry.com";
+        to.push(fallbackEmail);
       }
 
-      await sendEmailNotification(EMAIL_RECIPIENTS, subject, msg);
-      await sendSMSNotification(`SMS Alert: ${subject}`);
+      const fromDoc = await db.doc(FROM_EMAIL_DOC).get();
+      const emailConfig = fromDoc.exists ? fromDoc.data() : {};
 
-      logger.info("Notified status change for %s", afterData.APARTMENT);
+      const from = emailConfig.from ?
+        emailConfig.from : "leak-detection@automatry.com";
+      const replyTo = emailConfig.reply_to ?
+        emailConfig.reply_to : "no-reply@automatry.com";
+
+      const subject = notification.subject ?
+        notification.subject : "Leak or Status Alert";
+      const plainText = notification.message ?
+        notification.message : "Alert triggered.";
+      const html = renderNotificationHTML(notification);
+
+      // Deduplicate recipients across to, cc, and bcc
+      const allEmails = new Set([...to, ...cc, ...bcc]);
+      const cleanTo = to.filter((email) => email && allEmails.has(email));
+      const cleanCc = cc.filter((email) => email && !cleanTo.includes(email));
+      const cleanBcc = bcc.filter((email) => {
+        return email && !cleanTo.includes(email) && !cleanCc.includes(email);
+      });
+
+      const msg = {
+        to: cleanTo,
+        cc: cleanCc,
+        bcc: cleanBcc,
+        from: from,
+        replyTo: replyTo,
+        subject: subject,
+        text: plainText,
+        html: html,
+      };
+
+      logger.info("Final email payload:", JSON.stringify(msg, null, 2));
+      await sgMail.send(msg);
+
+      updateData.status = "sent";
     } catch (err) {
-      logger.error("Error in notifyStatusChange: %s", err.toString());
+      logger.error("Notification error:", err);
+      updateData.status = "error";
+      updateData.error = err.toString();
     }
+
+    await notificationRef.update(updateData);
   },
 );
