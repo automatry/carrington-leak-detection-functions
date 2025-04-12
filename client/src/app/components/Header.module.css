@@ -1,0 +1,54 @@
+/* components/Header.module.css */
+.header {
+    position: fixed; /* Make header fixed */
+    top: 0;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 2rem;
+    background-color: rgba(var(--card-rgb), 0.95); /* Slightly transparent */
+    backdrop-filter: blur(5px); /* Blur effect */
+    border-bottom: 1px solid rgb(var(--card-border-rgb));
+    z-index: 1000; /* Ensure it's on top */
+  }
+  
+  .logoContainer a {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: rgb(var(--primary-rgb));
+  }
+  
+  .nav {
+      display: flex;
+      gap: 1.5rem; /* Space between nav links */
+  }
+  
+  .navLink {
+      font-size: 1rem;
+      color: rgb(var(--secondary-rgb));
+      transition: color 0.2s ease;
+  }
+  
+  .navLink:hover {
+      color: rgb(var(--foreground-rgb));
+  }
+  
+  /* Add styles for active link if using next/navigation */
+  .navLinkActive {
+      color: rgb(var(--primary-rgb));
+      font-weight: 500;
+  }
+  
+  
+  .authContainer {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+  
+  .userName {
+      color: rgb(var(--secondary-rgb));
+      font-size: 0.9rem;
+  }

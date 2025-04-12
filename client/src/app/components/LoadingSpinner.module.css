@@ -1,0 +1,33 @@
+/* components/LoadingSpinner.module.css */
+.fullPageContainer {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh; /* Full viewport height */
+    background-color: rgba(var(--background-rgb), 0.8); /* Optional semi-transparent background */
+  }
+  
+  .inlineContainer {
+   display: flex;
+   flex-direction: column;
+   justify-content: center;
+   align-items: center;
+   padding: 2rem;
+  }
+  
+  .spinner {
+    border: 4px solid rgba(var(--foreground-rgb), 0.3); /* Light border */
+    border-left-color: rgb(var(--primary-rgb)); /* Accent color for spinning part */
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+  }
+  
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }

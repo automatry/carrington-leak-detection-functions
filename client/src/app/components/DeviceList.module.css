@@ -1,0 +1,41 @@
+/* components/DeviceList.module.css */
+.deviceListContainer {
+    margin-top: 2rem;
+  }
+  
+  .controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+  }
+  
+  .searchInput,
+  .selectInput {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid rgb(var(--card-border-rgb));
+    background-color: rgb(var(--card-rgb));
+    color: rgb(var(--foreground-rgb));
+    border-radius: var(--border-radius);
+    font-size: 0.95rem;
+  }
+  
+  .searchInput {
+    flex-grow: 1; /* Allow search to take more space */
+    min-width: 200px;
+  }
+  
+  .selectInput {
+      min-width: 150px;
+  }
+  
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Responsive grid */
+    gap: 1.5rem;
+  }
+  
+  .error {
+      color: rgb(var(--error-rgb));
+      margin-top: 1rem;
+  }

@@ -1,0 +1,16 @@
+/* styles/Page.module.css */
+.container {
+    max-width: 1200px; /* Wider container for pages */
+    margin: 2rem auto; /* Add margin below header */
+    padding: 0 2rem; /* Horizontal padding */
+  }
+  
+  .container h1 {
+    margin-bottom: 0.5rem;
+    color: rgb(var(--primary-rgb));
+  }
+  
+  .container p {
+    margin-bottom: 2rem;
+    color: rgb(var(--secondary-rgb));
+  }

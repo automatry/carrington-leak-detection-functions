@@ -1,0 +1,106 @@
+/* components/DeviceCard.module.css */
+.cardLink {
+    display: block; /* Make link fill the grid cell */
+    text-decoration: none;
+    color: inherit;
+  }
+  
+  .card {
+    background-color: rgb(var(--card-rgb));
+    border: 1px solid rgb(var(--card-border-rgb));
+    border-radius: var(--border-radius);
+    padding: 1.2rem;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    height: 100%; /* Make cards fill grid cell height */
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(var(--primary-rgb), 0.1);
+    border-color: rgba(var(--primary-rgb), 0.5);
+  }
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  
+  .header h3 {
+    color: rgb(var(--foreground-rgb));
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-right: 0.5rem; /* Space before badge */
+    /* Truncate long names */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .statusBadge {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.25rem;
+      font-weight: 500;
+      white-space: nowrap; /* Prevent badge wrapping */
+      flex-shrink: 0; /* Don't let badge shrink */
+      background-color: rgba(var(--foreground-rgb), 0.1); /* Subtle background */
+  }
+  
+  .project {
+    font-size: 0.85rem;
+    color: rgb(var(--secondary-rgb));
+    margin-bottom: 1rem;
+  }
+  
+  .infoGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Two columns */
+    gap: 0.5rem 1rem; /* Row and column gap */
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .infoItem {
+      display: flex;
+      justify-content: space-between; /* Align label and value */
+      align-items: baseline;
+  }
+  
+  .label {
+    color: rgb(var(--secondary-rgb));
+    margin-right: 0.5rem;
+  }
+  
+  .value {
+    font-weight: 500;
+    text-align: right; /* Align value to the right */
+  }
+  
+  .primarySensorInfo {
+      font-size: 0.8rem;
+      color: rgb(var(--secondary-rgb));
+      margin-top: auto; /* Push to bottom */
+      padding-top: 0.5rem;
+      border-top: 1px dashed rgba(var(--card-border-rgb), 0.5);
+  }
+  .pointCount {
+      font-size: 0.8rem;
+      color: rgb(var(--secondary-rgb));
+      margin-top: 0.5rem;
+  }
+  
+  /* Status Color Styling */
+  .statusActive, .statusOnline { color: rgb(var(--success-rgb)); }
+  .statusInactive, .statusOffline { color: rgb(var(--error-rgb)); }
+  .statusReadError { color: rgb(var(--warning-rgb)); }
+  .statusNotConfigured { color: rgb(var(--secondary-rgb)); font-style: italic; }
+  .statusNotCommissioned { color: rgb(var(--offline-rgb)); }
+  .statusUnknown { color: rgb(var(--warning-rgb)); }
+  
+  /* Badge specific colors */
+  .statusBadge.statusActive { background-color: rgba(var(--success-rgb), 0.2); color: rgb(var(--success-rgb));}
+  .statusBadge.statusNotCommissioned { background-color: rgba(var(--offline-rgb), 0.2); color: rgb(var(--offline-rgb));}

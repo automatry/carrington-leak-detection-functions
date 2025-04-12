@@ -1,0 +1,67 @@
+/* components/NotificationList.module.css */
+.listContainer {
+    margin-top: 2rem;
+  }
+  
+  .controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .selectInput { /* Reuse from DeviceList or create shared style */
+    padding: 0.6rem 0.8rem;
+    border: 1px solid rgb(var(--card-border-rgb));
+    background-color: rgb(var(--card-rgb));
+    color: rgb(var(--foreground-rgb));
+    border-radius: var(--border-radius);
+    font-size: 0.95rem;
+    min-width: 150px;
+  }
+  
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .table th,
+  .table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid rgb(var(--card-border-rgb));
+  }
+  
+  .table th {
+    color: rgb(var(--secondary-rgb));
+    font-weight: 500;
+    background-color: rgba(var(--card-rgb), 0.5);
+  }
+  
+  .table tbody tr:hover {
+    background-color: rgba(var(--card-rgb), 0.7);
+  }
+  
+  .typeBadge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 0.25rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background-color: rgb(var(--secondary-rgb));
+    color: rgb(var(--background-rgb));
+  }
+  
+  /* Add specific colors for badge types */
+  .type-leak-detected { background-color: rgb(var(--error-rgb)); color: white;}
+  .type-leak-cleared { background-color: rgb(var(--success-rgb)); color: white;}
+  .type-offline { background-color: rgb(var(--offline-rgb)); color: white;}
+  .type-online { background-color: rgb(var(--primary-rgb)); color: white;}
+  .type-read-error { background-color: rgb(var(--warning-rgb)); color: rgb(var(--background-rgb));}
+  /* Add more types */
+  
+  .error {
+      color: rgb(var(--error-rgb));
+      margin-top: 1rem;
+  }

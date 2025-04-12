@@ -1,0 +1,24 @@
+/* components/LoginPrompt.module.css */
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    border: 1px solid rgb(var(--card-border-rgb));
+    background-color: rgb(var(--card-rgb));
+    border-radius: var(--border-radius);
+    max-width: 500px;
+    margin: 4rem auto; /* Center on page */
+  }
+  
+  .container h2 {
+    margin-bottom: 1rem;
+    color: rgb(var(--primary-rgb));
+  }
+  
+  .container p {
+    margin-bottom: 2rem;
+    color: rgb(var(--secondary-rgb));
+  }

@@ -1,0 +1,159 @@
+/* src/app/components/DeviceConfigForm.module.css */
+.form {
+    background-color: rgb(var(--card-rgb));
+    border: 1px solid rgb(var(--card-border-rgb));
+    border-radius: var(--border-radius);
+    padding: 1.5rem 2rem;
+  }
+  
+  .form h2 {
+    color: rgb(var(--foreground-rgb));
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgb(var(--card-border-rgb));
+    padding-bottom: 0.8rem;
+  }
+  
+  .fieldset {
+    border: 1px solid rgba(var(--card-border-rgb), 0.7);
+    border-radius: calc(var(--border-radius) / 1.5);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  .fieldset legend {
+    padding: 0 0.8rem;
+    font-weight: 600;
+    color: rgb(var(--primary-rgb));
+  }
+  
+  .fieldGroup {
+    margin-bottom: 1.2rem;
+  }
+  .fieldGroup:last-child {
+    margin-bottom: 0;
+  }
+  
+  .fieldGroup label,
+  .fieldGroupCheckbox label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+    color: rgb(var(--secondary-rgb));
+  }
+  
+  .fieldGroup input[type="text"],
+  .fieldGroup input[type="number"],
+  .fieldGroup select {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid rgb(var(--card-border-rgb));
+    background-color: rgba(var(--background-rgb), 0.5); /* Slightly different bg for inputs */
+    color: rgb(var(--foreground-rgb));
+    border-radius: calc(var(--border-radius) / 1.5);
+    font-size: 0.95rem;
+    transition: border-color 0.2s ease;
+  }
+  
+  .fieldGroup input:focus,
+  .fieldGroup select:focus {
+      outline: none;
+      border-color: rgb(var(--primary-rgb));
+  }
+  
+  .fieldGroupCheckbox, .fieldGroupCheckboxInline {
+    display: flex;
+    align-items: center;
+    margin-top: 0.5rem;
+  }
+  
+  .fieldGroupCheckbox input[type="checkbox"],
+  .fieldGroupCheckboxInline input[type="checkbox"] {
+    margin-right: 0.6rem;
+    width: 16px;
+    height: 16px;
+    accent-color: rgb(var(--primary-rgb)); /* Style checkbox */
+  }
+  
+  .fieldGroupCheckbox label,
+  .fieldGroupCheckboxInline label {
+      margin-bottom: 0; /* Reset margin for checkbox labels */
+      color: rgb(var(--foreground-rgb));
+      font-size: 0.95rem;
+      cursor: pointer;
+  }
+  
+  .checkboxGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+  }
+  
+  .pointCard {
+      border: 1px solid rgba(var(--card-border-rgb), 0.5);
+      border-radius: calc(var(--border-radius) / 2);
+      padding: 1rem;
+      margin-bottom: 1rem;
+      background-color: rgba(var(--background-rgb), 0.3);
+  }
+  .pointCard:last-child {
+      margin-bottom: 0;
+  }
+  
+  .pointHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.8rem;
+  }
+  .pointHeader input {
+      flex-grow: 1;
+      margin-right: 1rem;
+      font-weight: 500;
+  }
+  
+  .removeButton {
+      background: none;
+      border: none;
+      color: rgb(var(--error-rgb));
+      font-size: 1.5rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0.2rem;
+  }
+  .removeButton:hover {
+      opacity: 0.8;
+  }
+  
+  
+  .pointGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.8rem;
+      margin-top: 0.8rem;
+      margin-bottom: 0.8rem;
+  }
+  
+  .pointGrid input {
+       width: 100%; /* Ensure inputs fill grid cells */
+  }
+  
+  .checkboxGroup {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 1rem;
+  }
+  
+  
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgb(var(--card-border-rgb));
+  }
+  
+  .actions button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+  }
