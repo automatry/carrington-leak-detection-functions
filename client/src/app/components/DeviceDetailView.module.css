@@ -1,94 +1,183 @@
 /* src/app/components/DeviceDetailView.module.css */
 .container {
-    background-color: rgb(var(--card-rgb));
-    border: 1px solid rgb(var(--card-border-rgb));
-    border-radius: var(--border-radius);
-    padding: 1.5rem 2rem;
-  }
-  
-  .container h2 {
-    color: rgb(var(--foreground-rgb));
-    margin-bottom: 0.25rem;
-    border-bottom: 1px solid rgb(var(--card-border-rgb));
-    padding-bottom: 0.5rem;
-  }
-  
-  .project {
-    font-size: 0.9rem;
-    color: rgb(var(--secondary-rgb));
-    margin-bottom: 1.5rem;
-  }
-  
-  .section {
-    margin-bottom: 2rem;
-  }
-  
-  .section h3 {
-    color: rgb(var(--primary-rgb));
-    margin-bottom: 1rem;
-    font-size: 1.1rem;
-    font-weight: 600;
-  }
-  
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 0.75rem 1.5rem;
-  }
-  
-  .item {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.95rem;
-    padding-bottom: 0.3rem;
-    border-bottom: 1px dotted rgba(var(--card-border-rgb), 0.5);
-  }
-  
-  .label {
-    color: rgb(var(--secondary-rgb));
-    margin-right: 1rem;
-  }
-  
-  .preFormatted {
-    background-color: rgba(var(--background-rgb), 0.5);
-    border: 1px solid rgb(var(--card-border-rgb));
-    border-radius: calc(var(--border-radius) / 2);
-    padding: 1rem;
-    font-family: var(--font-geist-mono), monospace;
-    font-size: 0.85rem;
-    white-space: pre-wrap; /* Allow wrapping */
-    word-break: break-all; /* Break long strings */
-    max-height: 400px;
-    overflow-y: auto;
-  }
-  
-  .pointItem {
-      padding: 0.4rem 0;
-      border-bottom: 1px dotted rgba(var(--card-border-rgb), 0.3);
-      font-size: 0.9rem;
-  }
-  .pointItem:last-child {
-      border-bottom: none;
-  }
-  
-  .primaryBadge, .polarityBadge {
-      font-size: 0.7rem;
-      padding: 0.1rem 0.4rem;
-      border-radius: 0.2rem;
-      margin-left: 0.5rem;
-      font-weight: 500;
-      background-color: rgba(var(--primary-rgb), 0.8);
-      color: white;
-  }
-  .polarityBadge {
-       background-color: rgba(var(--secondary-rgb), 0.8);
-  }
-  
-  
-  /* Status colors (copied from DeviceCard for consistency) */
-  .statusActive, .statusOnline { color: rgb(var(--success-rgb)); }
-  .statusInactive, .statusOffline { color: rgb(var(--error-rgb)); }
-  .statusReadError { color: rgb(var(--warning-rgb)); }
-  .statusNotConfigured { color: rgb(var(--secondary-rgb)); font-style: italic; }
-  .statusNotCommissioned { color: rgb(var(--offline-rgb)); }
-  .statusUnknown { color: rgb(var(--warning-rgb)); }
+  background-color: rgb(var(--card-rgb));
+  border: 1px solid rgb(var(--card-border-rgb));
+  border-radius: var(--border-radius);
+  padding: 1.5rem 2rem;
+  color: rgb(var(--foreground-rgb)); /* Ensure text color */
+}
+
+.container h2 {
+  color: rgb(var(--primary-rgb)); /* Make title stand out */
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid rgb(var(--card-border-rgb));
+  padding-bottom: 0.8rem; /* Increase padding */
+  font-size: 1.5rem; /* Larger title */
+}
+
+.project {
+  font-size: 0.9rem;
+  color: rgb(var(--secondary-rgb));
+  margin-bottom: 1.8rem; /* More space below project */
+}
+
+.section {
+  margin-bottom: 2rem;
+}
+.section:last-child {
+  margin-bottom: 0; /* Remove margin from last section */
+}
+
+.section h3 {
+  color: rgb(var(--primary-rgb));
+  margin-bottom: 1rem;
+  font-size: 1.15rem; /* Slightly larger section titles */
+  font-weight: 600;
+  border-bottom: 1px dotted rgba(var(--card-border-rgb), 0.5); /* Subtle separator */
+  padding-bottom: 0.5rem;
+}
+
+.grid {
+  display: grid;
+  /* Adjust columns for potentially wider content */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0.8rem 1.8rem; /* Increase column gap */
+}
+
+.item {
+  display: flex;
+  /* justify-content: space-between; Remove this */
+  align-items: baseline; /* Align text nicely */
+  font-size: 0.95rem;
+  padding-bottom: 0.4rem; /* Increase padding */
+  border-bottom: 1px dotted rgba(var(--card-border-rgb), 0.3);
+  gap: 0.8rem; /* Add gap between label and value */
+}
+
+.label {
+  color: rgb(var(--secondary-rgb));
+  font-weight: 500; /* Make label slightly bolder */
+  flex-shrink: 0; /* Prevent label from shrinking */
+  min-width: 120px; /* Give labels consistent width */
+  text-align: right; /* Align label text right */
+}
+
+.valueWrap {
+  /* Allows value text to wrap if needed */
+  word-break: break-word;
+  text-align: left; /* Align value text left */
+}
+
+/* Point List Styles */
+.pointList {
+  list-style: none; /* Remove default list bullets */
+  padding: 0;
+  margin: 0;
+}
+
+.pointItem {
+  padding: 0.6rem 0; /* Increase padding */
+  border-bottom: 1px solid rgba(var(--card-border-rgb), 0.2); /* Lighter border */
+  font-size: 0.9rem;
+  display: flex; /* Use flex for alignment */
+  align-items: center;
+  gap: 0.8rem; /* Space between elements */
+  flex-wrap: wrap; /* Allow wrapping on small screens */
+}
+.pointItem:last-child {
+  border-bottom: none;
+}
+.pointItem strong {
+  color: rgb(var(--foreground-rgb)); /* Ensure contrast */
+  min-width: 100px; /* Give ID some space */
+}
+.pointDetails {
+  color: rgb(var(--secondary-rgb));
+  font-size: 0.85rem;
+  flex-grow: 1; /* Allow details to take space */
+}
+.badge {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.2rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.primaryBadge { background-color: rgba(var(--primary-rgb), 0.8); color: white; }
+.polarityBadge { background-color: rgba(var(--secondary-rgb), 0.8); color: white;}
+
+
+/* --- Collapsible Section Styles --- */
+.collapsibleSection {
+  margin-bottom: 1.5rem; /* Space between sections */
+  border: 1px solid rgba(var(--card-border-rgb), 0.5);
+  border-radius: calc(var(--border-radius) / 2);
+  overflow: hidden; /* Contain background */
+}
+
+.summary {
+  display: block; /* Make it block level */
+  padding: 0.8rem 1rem;
+  cursor: pointer;
+  background-color: rgba(var(--card-border-rgb), 0.3); /* Slight background */
+  font-weight: 600;
+  font-size: 1.05rem; /* Match H3 size */
+  color: rgb(var(--primary-rgb));
+  list-style: none; /* Remove default marker */
+  position: relative; /* For custom marker */
+  transition: background-color 0.2s ease;
+}
+.summary:hover {
+  background-color: rgba(var(--card-border-rgb), 0.5);
+}
+
+/* Custom Marker */
+.summary::before {
+  content: '►'; /* Closed state marker */
+  position: absolute;
+  left: 0.5rem; /* Adjust position */
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.8em;
+  transition: transform 0.2s ease;
+}
+.collapsibleSection[open] > .summary::before {
+  transform: translateY(-50%) rotate(90deg); /* Rotate marker when open */
+}
+/* Hide default marker for Webkit */
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+
+.preFormatted {
+  background-color: rgba(var(--background-rgb), 0.7); /* Darker background */
+  /* border: 1px solid rgb(var(--card-border-rgb)); Removed border */
+  /* border-radius: calc(var(--border-radius) / 2); */
+  padding: 1rem 1.5rem; /* More padding */
+  font-family: Consolas, 'Courier New', monospace; /* Use monospace font */
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 400px; /* Keep max height */
+  overflow-y: auto;
+  color: rgb(var(--foreground-rgb)); /* Ensure text is visible */
+  margin-top: 0; /* Remove margin if section has border */
+  border-top: 1px solid rgba(var(--card-border-rgb), 0.5); /* Add top border */
+}
+
+.noData {
+  padding: 1rem 1.5rem;
+  color: rgb(var(--secondary-rgb));
+  font-style: italic;
+}
+
+
+/* --- Status colors --- */
+.statusCommissioned { color: rgb(var(--primary-rgb)); font-weight: bold; }
+.statusNotCommissioned { color: rgb(var(--warning-rgb)); }
+.statusActive, .statusOnline { color: rgb(var(--success-rgb)); }
+.statusInactive, .statusOffline { color: rgb(var(--error-rgb)); }
+.statusReadError { color: rgb(var(--warning-rgb)); }
+.statusNotConfigured { color: rgb(var(--secondary-rgb)); font-style: italic; }
+.statusUnknown { color: rgb(var(--warning-rgb)); }

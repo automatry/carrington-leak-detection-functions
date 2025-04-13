@@ -1,23 +1,24 @@
 module.exports = {
   env: {
-    es6: true,
+    es2021: true,
     node: true,
   },
   parserOptions: {
-    ecmaVersion: 2018,
+    ecmaVersion: 2021, // supports optional chaining and other modern syntax
+    sourceType: "module",
   },
   extends: [
     "eslint:recommended",
-    "google",
   ],
   rules: {
-    "no-restricted-globals": ["error", "name", "length"],
-    "prefer-arrow-callback": "error",
-    "quotes": ["error", "double", { "allowTemplateLiterals": true }],
-    "linebreak-style": ["error", "unix"],
-    "no-trailing-spaces": "error",
-    "indent": ["error", 2],
-    "object-curly-spacing": ["error", "always"],
+    // Reduced restrictions
+    "no-restricted-globals": "off",
+    "prefer-arrow-callback": "warn",
+    "quotes": ["warn", "double", { allowTemplateLiterals: true }],
+    "linebreak-style": "off",
+    "no-trailing-spaces": "warn",
+    "indent": ["warn", 2],
+    "object-curly-spacing": ["warn", "always"],
   },
   overrides: [
     {

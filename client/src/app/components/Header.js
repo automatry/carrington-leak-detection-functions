@@ -11,7 +11,7 @@ export default function Header() {
   return (
     <header className={styles.header}>
       <div className={styles.logoContainer}>
-        <Link href="/">BACnet Monitor</Link> {/* Simple Text Logo */}
+        <Link href="/">Automatry Commissioning Tool</Link> {/* Simple Text Logo */}
       </div>
       <nav className={styles.nav}>
          {user && ( // Show nav links only if logged in

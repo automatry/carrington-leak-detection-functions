@@ -1,55 +1,57 @@
 /* globals.css */
+/* globals.css */
 :root {
-  /* Soft Dark Blue/Gray Theme */
-  --background-rgb: 16, 24, 39; /* Deep blue-gray */
-  --foreground-rgb: 229, 231, 235; /* Light gray */
+  /* Dark theme with deep accents */
+  --background-rgb: 10, 10, 10; /* near black background */
+  --foreground-rgb: 240, 240, 240; /* near white text */
+  --card-rgb: 20, 20, 20; /* very dark card background */
+  --card-border-rgb: 50, 50, 50; /* subtle borders */
+  
+  --primary-rgb: 30, 144, 255; /* vibrant deep blue, e.g. DodgerBlue */
+  --primary-hover-rgb: 24, 116, 205; /* slightly darker on hover */
+  --secondary-rgb: 100, 149, 237; /* CornflowerBlue-like accent */
+  
+  --success-rgb: 0, 200, 0; /* Green for success */
+  --warning-rgb: 255, 165, 0; /* Orange for warnings */
+  --error-rgb: 255, 69, 0;    /* Red-orange for errors */
+  --offline-rgb: 128, 128, 128; /* Gray for offline */
 
-  --card-rgb: 28, 39, 58; /* Slightly lighter blue-gray for cards */
-  --card-border-rgb: 55, 65, 81; /* Muted border */
-
-  --primary-rgb: 79, 114, 188; /* Accent blue */
-  --primary-hover-rgb: 66, 98, 164;
-  --secondary-rgb: 107, 114, 128; /* Gray for secondary text/elements */
-
-  --success-rgb: 16, 185, 129; /* Green */
-  --warning-rgb: 245, 158, 11; /* Amber */
-  --error-rgb: 239, 68, 68;   /* Red */
-  --offline-rgb: 120, 113, 108; /* Stone */
-
-
-  --border-radius: 0.5rem; /* Rounded corners */
+  --border-radius: 0.5rem; /* rounded corners */
+  
+  /* Use system UI fonts */
+  --font-family-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
-
-/* No change needed for @media (prefers-color-scheme: dark)
-   as we are defaulting to dark */
 
 html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
+  background-color: rgb(var(--background-rgb));
   color: rgb(var(--foreground-rgb));
-  background-color: rgb(var(--background-rgb)); /* Use background-color */
+  font-family: var(--font-family-sans);
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  padding-top: 4rem; /* Add padding for fixed header */
+  padding-top: 4rem; /* space for fixed header */
 }
 
 * {
   box-sizing: border-box;
-  padding: 0;
   margin: 0;
+  padding: 0;
 }
 
+/* Links */
 a {
   color: inherit;
   text-decoration: none;
 }
 
-/* Basic Button Style (can be moved to a component CSS module) */
+/* Basic Button Style */
 .button {
   background-color: rgb(var(--primary-rgb));
   color: rgb(var(--foreground-rgb));
@@ -57,13 +59,17 @@ a {
   border: none;
   border-radius: var(--border-radius);
   cursor: pointer;
-  font-size: 0.95rem;
-  font-weight: 500;
+  font-size: 1rem;
   transition: background-color 0.2s ease-in-out;
 }
 
 .button:hover {
   background-color: rgb(var(--primary-hover-rgb));
+}
+
+/* Utility */
+.error {
+  color: rgb(var(--error-rgb));
 }
 
 .button-secondary {

@@ -1,106 +1,243 @@
 /* components/DeviceCard.module.css */
+/* components/DeviceCard.module.css */
 .cardLink {
-    display: block; /* Make link fill the grid cell */
-    text-decoration: none;
-    color: inherit;
-  }
-  
-  .card {
-    background-color: rgb(var(--card-rgb));
-    border: 1px solid rgb(var(--card-border-rgb));
-    border-radius: var(--border-radius);
-    padding: 1.2rem;
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-    height: 100%; /* Make cards fill grid cell height */
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  flex-grow: 1;
+}
+
+.cardContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  height: 100%;
+  background-color: rgb(var(--card-rgb));
+  border: 1px solid rgb(var(--card-border-rgb));
+  border-radius: var(--border-radius);
+  padding: 1.2rem;
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.cardContainer:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 10px rgba(var(--primary-rgb), 0.3);
+  border-color: rgba(var(--primary-rgb), 0.5);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  /* Reduced margin below header */
+  margin-bottom: 0.5rem;
+  gap: 0.8rem;
+}
+
+.titleSection {
     display: flex;
     flex-direction: column;
-  }
-  
-  .card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 10px rgba(var(--primary-rgb), 0.1);
-    border-color: rgba(var(--primary-rgb), 0.5);
-  }
-  
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-  }
-  
-  .header h3 {
-    color: rgb(var(--foreground-rgb));
-    font-weight: 600;
-    font-size: 1.1rem;
-    margin-right: 0.5rem; /* Space before badge */
-    /* Truncate long names */
+    gap: 0.1rem; /* Small gap between title lines */
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.apartmentName {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.friendlyNameDisplay {
+    font-weight: 400;
+    font-size: 0.95rem;
+    color: rgb(var(--secondary-rgb));
+    margin: 0; /* Remove specific margins */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  
-  .statusBadge {
-      font-size: 0.75rem;
-      padding: 0.2rem 0.5rem;
-      border-radius: 0.25rem;
-      font-weight: 500;
-      white-space: nowrap; /* Prevent badge wrapping */
-      flex-shrink: 0; /* Don't let badge shrink */
-      background-color: rgba(var(--foreground-rgb), 0.1); /* Subtle background */
-  }
-  
-  .project {
-    font-size: 0.85rem;
-    color: rgb(var(--secondary-rgb));
-    margin-bottom: 1rem;
-  }
-  
-  .infoGrid {
-    display: grid;
-    grid-template-columns: 1fr 1fr; /* Two columns */
-    gap: 0.5rem 1rem; /* Row and column gap */
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-  }
-  
-  .infoItem {
-      display: flex;
-      justify-content: space-between; /* Align label and value */
-      align-items: baseline;
-  }
-  
-  .label {
-    color: rgb(var(--secondary-rgb));
-    margin-right: 0.5rem;
-  }
-  
-  .value {
-    font-weight: 500;
-    text-align: right; /* Align value to the right */
-  }
-  
-  .primarySensorInfo {
-      font-size: 0.8rem;
-      color: rgb(var(--secondary-rgb));
-      margin-top: auto; /* Push to bottom */
-      padding-top: 0.5rem;
-      border-top: 1px dashed rgba(var(--card-border-rgb), 0.5);
-  }
-  .pointCount {
-      font-size: 0.8rem;
-      color: rgb(var(--secondary-rgb));
-      margin-top: 0.5rem;
-  }
-  
-  /* Status Color Styling */
-  .statusActive, .statusOnline { color: rgb(var(--success-rgb)); }
-  .statusInactive, .statusOffline { color: rgb(var(--error-rgb)); }
-  .statusReadError { color: rgb(var(--warning-rgb)); }
-  .statusNotConfigured { color: rgb(var(--secondary-rgb)); font-style: italic; }
-  .statusNotCommissioned { color: rgb(var(--offline-rgb)); }
-  .statusUnknown { color: rgb(var(--warning-rgb)); }
-  
-  /* Badge specific colors */
-  .statusBadge.statusActive { background-color: rgba(var(--success-rgb), 0.2); color: rgb(var(--success-rgb));}
-  .statusBadge.statusNotCommissioned { background-color: rgba(var(--offline-rgb), 0.2); color: rgb(var(--offline-rgb));}
+}
+
+.serialDisplay {
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: rgba(var(--secondary-rgb), 0.8);
+    margin: 0; /* Remove specific margins */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.statusBadges {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+    flex-shrink: 0;
+}
+
+.statusBadge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+  white-space: nowrap;
+  background-color: rgba(var(--foreground-rgb), 0.1);
+  border: 1px solid transparent;
+  /* --- Added for consistent sizing --- */
+  min-width: 100px; /* Adjust as needed based on longest text */
+  text-align: center;
+  display: inline-block; /* Or flex if needed */
+  /* --- End sizing --- */
+}
+
+/* Project section - adjust spacing if needed */
+.project {
+  font-size: 0.85rem;
+  color: rgb(var(--secondary-rgb));
+  /* Reduced margin below project */
+  margin-bottom: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem 1rem; /* Adjusted row gap */
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.infoItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.label {
+  color: rgb(var(--secondary-rgb));
+  flex-shrink: 0;
+}
+
+.value {
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Footer section for sensor/points */
+.footerSection {
+  margin-top: auto; /* Pushes this section down */
+  padding-top: 0.8rem;
+  border-top: 1px dashed rgba(var(--card-border-rgb), 0.5);
+}
+
+.primarySensorInfo {
+  font-size: 0.8rem;
+  color: rgb(var(--secondary-rgb));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.3rem; /* Space before point count */
+}
+.primarySensorInfo span:last-child {
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: bottom;
+}
+
+.pointCount {
+  font-size: 0.8rem;
+  color: rgb(var(--secondary-rgb));
+  /* margin-top: 0.5rem; Removed, spacing handled by parent gap */
+}
+
+/* Status Styling (Same as before) */
+.statusProvisioned { background-color: rgba(var(--success-rgb), 0.2); color: rgb(var(--success-rgb)); border-color: rgba(var(--success-rgb), 0.4); }
+.statusNotProvisioned { background-color: rgba(var(--offline-rgb), 0.2); color: rgb(var(--offline-rgb)); border-color: rgba(var(--offline-rgb), 0.4);}
+.statusCommissioned { background-color: rgba(var(--primary-rgb), 0.2); color: rgb(var(--primary-rgb)); border-color: rgba(var(--primary-rgb), 0.4);}
+.statusNotCommissioned { background-color: rgba(var(--warning-rgb), 0.15); color: rgb(var(--warning-rgb)); border-color: rgba(var(--warning-rgb), 0.3);}
+.statusactive, .statusonline { color: rgb(var(--success-rgb)); }
+.statusinactive, .statusoffline { color: rgb(var(--error-rgb)); }
+.statusonline_read_error { color: rgb(var(--warning-rgb)); }
+.statusnot_configured { color: rgb(var(--secondary-rgb)); font-style: italic; }
+.statusunknown { color: rgb(var(--warning-rgb)); }
+
+
+/* --- Provision button and Error Section --- */
+.provisionSection {
+  display: flex;
+  flex-direction: column; /* Stack button and error */
+  align-items: center; /* Center items */
+  gap: 0.4rem; /* Space between button and error */
+  margin-top: 0.5rem; /* Consistent gap, adjust if needed */
+  width: 100%; /* Take full width for centering */
+}
+
+.provisionButton {
+display: inline-flex; /* Use inline-flex for spinner alignment */
+align-items: center;
+justify-content: center;
+gap: 0.5rem; /* Space between spinner and text */
+width: auto;
+padding: 0.4rem 0.8rem;
+background-color: rgb(var(--secondary-rgb));
+color: rgb(var(--foreground-rgb));
+border: none;
+border-radius: calc(var(--border-radius) / 1.5);
+cursor: pointer;
+font-size: 0.8rem;
+transition: background-color 0.2s ease-in-out, opacity 0.2s ease;
+text-decoration: none;
+flex-shrink: 0;
+}
+
+.provisionButton:hover:not(:disabled) { /* Add :not(:disabled) */
+background-color: rgba(var(--secondary-rgb), 0.8);
+}
+
+.provisionButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Style for the loading spinner inside the button */
+.provisionButton > span {
+  display: inline-block; /* Keep text on same line */
+}
+/* Assuming LoadingSpinner component renders a div/span */
+.provisionButton > div, .provisionButton > span[role="status"] { /* Target spinner specifically */
+  width: 1em; /* Adjust size as needed */
+  height: 1em;
+  /* Add spinner specific styles if LoadingSpinner doesn't handle it */
+}
+
+
+.downloadErrorText {
+  font-size: 0.8rem;
+  color: rgb(var(--error-rgb));
+  text-align: center;
+  width: 100%;
+  margin: 0; /* Reset default margin */
+}
+
+/* --- End Provision section --- */
+
+/* --- Status Styling --- (Keep all previous status styles) */
+.statusProvisioned { background-color: rgba(var(--success-rgb), 0.2); color: rgb(var(--success-rgb)); border-color: rgba(var(--success-rgb), 0.4); }
+.statusNotProvisioned { background-color: rgba(var(--offline-rgb), 0.2); color: rgb(var(--offline-rgb)); border-color: rgba(var(--offline-rgb), 0.4);}
+/* ... etc ... */

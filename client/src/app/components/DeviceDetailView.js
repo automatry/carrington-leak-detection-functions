@@ -1,26 +1,51 @@
 // src/app/components/DeviceDetailView.js
-import styles from './DeviceDetailView.module.css'; // Create this CSS module
+import styles from './DeviceDetailView.module.css'; // Use the updated one below
 import { useMemo } from 'react';
 
-// Reusable status class helper (could be moved to utils)
+// Reusable status class helper
 const getStatusClass = (status) => {
     const statusLower = status?.toLowerCase() || 'unknown';
-    switch (statusLower) {
-      case 'active': return styles.statusActive;
-      case 'inactive': return styles.statusInactive;
-      case 'online': return styles.statusOnline;
-      case 'offline': return styles.statusOffline;
-      case 'online_read_error': return styles.statusReadError;
-      case 'not_configured': return styles.statusNotConfigured;
-      case 'not_commissioned': return styles.statusNotCommissioned;
-      default: return styles.statusUnknown;
-    }
+    // Map common statuses to CSS classes (ensure these classes exist in the CSS)
+    const statusMap = {
+        'active': styles.statusActive,
+        'inactive': styles.statusInactive,
+        'online': styles.statusOnline,
+        'offline': styles.statusOffline,
+        'online_read_error': styles.statusReadError,
+        'not_configured': styles.statusNotConfigured,
+        'not_commissioned': styles.statusNotCommissioned,
+        'stopped': styles.statusInactive, // Example mapping
+        // Add more mappings as needed
+    };
+    return statusMap[statusLower] || styles.statusUnknown; // Fallback
 };
 
-export default function DeviceDetailView({ device }) {
-    const { id, identity, state, config } = device;
+// Component to render JSON data nicely within a collapsible section
+const JsonSection = ({ title, data, initiallyOpen = false }) => {
+    if (!data || Object.keys(data).length === 0) {
+        return (
+            <details className={styles.collapsibleSection}>
+                <summary className={styles.summary}>{title}</summary>
+                <p className={styles.noData}>No data available.</p>
+            </details>
+        );
+    }
 
-    // Extract data safely
+    return (
+        <details className={styles.collapsibleSection} open={initiallyOpen}>
+            <summary className={styles.summary}>{title}</summary>
+            <pre className={styles.preFormatted}>
+                {JSON.stringify(data, null, 2)}
+            </pre>
+        </details>
+    );
+};
+
+
+export default function DeviceDetailView({ device }) {
+    const { id, serial, identity, state, config } = device || {}; // Add serial
+
+    // Extract data safely with fallbacks
     const apartment = identity?.APARTMENT || 'N/A';
     const project = identity?.PROJECT || 'N/A';
     const commissioned = identity?.commissioned ?? false;
@@ -34,6 +59,7 @@ export default function DeviceDetailView({ device }) {
     const primarySensorDetails = state?.primary_leak_sensor_details;
     const discoveredDevices = state?.discovered_bacnet_devices || {};
     const reachability = state?.bacnet_device_reachability || {};
+    const livePointStates = state?.read_point_states || {};
     const firstSeen = state?.firstSeen;
 
     // Format timestamps
@@ -41,72 +67,64 @@ export default function DeviceDetailView({ device }) {
     const firstSeenString = useMemo(() => firstSeen?.toDate ? firstSeen.toDate().toLocaleString() : 'N/A', [firstSeen]);
 
     // Get Status Classes
+    const commissionedClass = commissioned ? styles.statusCommissioned : styles.statusNotCommissioned; // Use specific classes
     const connectivityClass = getStatusClass(connectivityStatus);
     const leakClass = getStatusClass(leakStatus);
-    const commissionedClass = commissioned ? styles.statusActive : styles.statusNotCommissioned;
     const serviceClass = getStatusClass(serviceStatus);
     const socketClass = getStatusClass(socketStatus);
 
     return (
         <div className={styles.container}>
-            <h2>{apartment} ({id})</h2>
+            {/* Use consistent h2 for main title */}
+            <h2>{identity?.APARTMENT || id} ({id})</h2>
             <p className={styles.project}>Project: {project}</p>
 
+            {/* --- Identity & Status Section --- */}
             <div className={styles.section}>
                 <h3>Identity & Status</h3>
                 <div className={styles.grid}>
-                    <div className={styles.item}><span className={styles.label}>UUID:</span> <span>{id}</span></div>
+                    {/* Use consistent item structure */}
+                    <div className={styles.item}><span className={styles.label}>UUID:</span> <span className={styles.valueWrap}>{id}</span></div>
+                    <div className={styles.item}><span className={styles.label}>Serial:</span> <span className={styles.valueWrap}>{serial || 'N/A'}</span></div>
                     <div className={styles.item}><span className={styles.label}>Commissioned:</span> <span className={commissionedClass}>{commissioned ? 'Yes' : 'No'}</span></div>
                     <div className={styles.item}><span className={styles.label}>Connectivity:</span> <span className={connectivityClass}>{connectivityStatus}</span></div>
                     <div className={styles.item}><span className={styles.label}>Leak Status:</span> <span className={leakClass}>{leakStatus}</span></div>
                     <div className={styles.item}><span className={styles.label}>Service Status:</span> <span className={serviceClass}>{serviceStatus}</span></div>
                     <div className={styles.item}><span className={styles.label}>Socket Status:</span> <span className={socketClass}>{socketStatus}</span></div>
-                    <div className={styles.item}><span className={styles.label}>Device IP:</span> <span>{deviceIP}</span></div>
-                    <div className={styles.item}><span className={styles.label}>First Seen:</span> <span>{firstSeenString}</span></div>
-                    <div className={styles.item}><span className={styles.label}>Last Update:</span> <span>{lastUpdateString}</span></div>
+                    <div className={styles.item}><span className={styles.label}>Device IP:</span> <span className={styles.valueWrap}>{deviceIP}</span></div>
+                    <div className={styles.item}><span className={styles.label}>First Seen:</span> <span className={styles.valueWrap}>{firstSeenString}</span></div>
+                    <div className={styles.item}><span className={styles.label}>Last Update:</span> <span className={styles.valueWrap}>{lastUpdateString}</span></div>
                 </div>
             </div>
 
-            {primarySensorDetails && (
-                <div className={styles.section}>
-                    <h3>Primary Leak Sensor Details</h3>
-                    <pre className={styles.preFormatted}>{JSON.stringify(primarySensorDetails, null, 2)}</pre>
-                </div>
-            )}
-
-             <div className={styles.section}>
+            {/* --- Configured Read Points Section --- */}
+            <div className={styles.section}>
                  <h3>Configured Read Points ({points.length})</h3>
                  {points.length > 0 ? (
-                     points.map((point, index) => (
-                         <div key={point.id || index} className={styles.pointItem}>
-                             <strong>{point.id}</strong> ({point.object_type}/{point.object_instance}) Target: {point.target_device_instance}
-                             {point.is_primary_leak_sensor && <span className={styles.primaryBadge}>Primary</span>}
-                             {point.invert_polarity && <span className={styles.polarityBadge}>Inverted</span>}
-                         </div>
-                     ))
-                 ) : <p>No read points configured.</p>}
+                     <ul className={styles.pointList}> {/* Use a list for points */}
+                        {points.map((point, index) => (
+                            <li key={point.id || index} className={styles.pointItem}>
+                                <strong>{point.id || `Point ${index + 1}`}</strong>
+                                <span className={styles.pointDetails}>
+                                    ({point.object_type || 'N/A'} / {point.object_instance ?? 'N/A'}) Target: {point.target_device_instance ?? 'Any'}
+                                </span>
+                                {point.is_primary_leak_sensor && <span className={`${styles.badge} ${styles.primaryBadge}`}>Primary</span>}
+                                {point.invert_polarity && <span className={`${styles.badge} ${styles.polarityBadge}`}>Inverted</span>}
+                            </li>
+                        ))}
+                     </ul>
+                 ) : <p className={styles.noData}>No read points configured.</p>}
              </div>
 
-            <div className={styles.section}>
-                <h3>Live Point States</h3>
-                {Object.keys(state?.read_point_states || {}).length > 0 ? (
-                    <pre className={styles.preFormatted}>{JSON.stringify(state.read_point_states, null, 2)}</pre>
-                ) : <p>No live point states available.</p>}
-            </div>
 
-             <div className={styles.section}>
-                <h3>Discovered BACnet Devices</h3>
-                 {Object.keys(discoveredDevices).length > 0 ? (
-                    <pre className={styles.preFormatted}>{JSON.stringify(discoveredDevices, null, 2)}</pre>
-                 ) : <p>No devices discovered in last scan.</p>}
-            </div>
+             {/* --- Collapsible JSON Sections --- */}
+             {/* Use the JsonSection component */}
+             <JsonSection title="Primary Leak Sensor Details" data={primarySensorDetails} />
+             <JsonSection title="Live Point States" data={livePointStates} />
+             <JsonSection title="Discovered BACnet Devices" data={discoveredDevices} />
+             <JsonSection title="Device Reachability" data={reachability} />
+             {/* --- End Collapsible Sections --- */}
 
-             <div className={styles.section}>
-                <h3>Device Reachability</h3>
-                 {Object.keys(reachability).length > 0 ? (
-                    <pre className={styles.preFormatted}>{JSON.stringify(reachability, null, 2)}</pre>
-                 ) : <p>No reachability data available.</p>}
-            </div>
-        </div>
+        </div> // End container
     );
 }

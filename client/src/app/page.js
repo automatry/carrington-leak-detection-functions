@@ -28,7 +28,7 @@ export default function HomePage() {
   if (!user) {
     return (
        <div className={styles.container}>
-            <h1>Welcome to the BACnet Monitor</h1>
+            <h1>Welcome to the Automatry Commissioning Tool</h1>
             <LoginPrompt />
        </div>
     );

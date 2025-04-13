@@ -1,41 +1,116 @@
 /* components/DeviceList.module.css */
 .deviceListContainer {
-    margin-top: 2rem;
-  }
-  
-  .controls {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
-  }
-  
-  .searchInput,
-  .selectInput {
-    padding: 0.6rem 0.8rem;
-    border: 1px solid rgb(var(--card-border-rgb));
-    background-color: rgb(var(--card-rgb));
-    color: rgb(var(--foreground-rgb));
+  margin-top: 2rem;
+}
+
+.controls {
+  display: flex;
+  gap: 0.8rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Common style for inputs/buttons in controls */
+.searchInput,
+.selectInput,
+.controlButton,
+.filterButton { /* Added filterButton */
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgb(var(--card-border-rgb));
+  background-color: rgb(var(--card-rgb));
+  color: rgb(var(--foreground-rgb));
+  border-radius: var(--border-radius);
+  font-size: 0.9rem;
+  height: 38px;
+  box-sizing: border-box;
+  cursor: pointer; /* Make buttons look clickable */
+}
+
+.searchInput {
+  flex-grow: 1;
+  min-width: 250px;
+  cursor: text; /* Reset cursor for input */
+}
+
+.selectInput {
+  min-width: 180px;
+}
+
+/* Specific Button Styles */
+.viewToggle, /* Keep existing view toggle style */
+.addDeviceButton {
+  background-color: rgb(var(--primary-rgb));
+  font-weight: 500;
+}
+.viewToggle:hover,
+.addDeviceButton:hover {
+  background-color: rgb(var(--primary-hover-rgb));
+}
+
+/* --- Filter Button Group Styles --- */
+.filterButtonGroup {
+    display: inline-flex; /* Group buttons together */
+    align-items: center;
+    gap: 0.5rem; /* Space between label and buttons */
+    background-color: rgb(var(--card-rgb)); /* Match background */
+    padding: 0.3rem 0.5rem; /* Some padding around the group */
     border-radius: var(--border-radius);
-    font-size: 0.95rem;
-  }
-  
-  .searchInput {
-    flex-grow: 1; /* Allow search to take more space */
-    min-width: 200px;
-  }
-  
-  .selectInput {
-      min-width: 150px;
-  }
-  
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Responsive grid */
-    gap: 1.5rem;
-  }
-  
-  .error {
-      color: rgb(var(--error-rgb));
-      margin-top: 1rem;
-  }
+    border: 1px solid rgb(var(--card-border-rgb));
+}
+
+.filterButtonGroup span { /* Style the label (e.g., "Provisioned:") */
+    font-size: 0.9rem;
+    color: rgb(var(--secondary-rgb));
+    margin-right: 0.3rem;
+}
+
+.filterButton {
+    padding: 0.3rem 0.7rem; /* Smaller padding for filter buttons */
+    font-size: 0.85rem;
+    height: auto; /* Override fixed height */
+    border: 1px solid transparent; /* Default border */
+    background-color: rgba(var(--foreground-rgb), 0.1); /* Default background */
+    color: rgb(var(--secondary-rgb)); /* Default color */
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.filterButton:hover {
+    background-color: rgba(var(--foreground-rgb), 0.2);
+}
+
+.activeFilterButton {
+    /* Styles for the selected button */
+    background-color: rgb(var(--primary-rgb));
+    color: rgb(var(--background-rgb)); /* Dark background for text */
+    font-weight: 600;
+    border-color: rgb(var(--primary-hover-rgb));
+}
+/* --- End Filter Button Group Styles --- */
+
+
+/* Grid View */
+.grid {
+  display: grid;
+  /* Adjust minmax for potentially taller cards */
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+/* List View */
+.listView {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem; /* Space between list items */
+}
+
+.listItem {
+   /* Add specific styles for list items if needed */
+   /* e.g., border-bottom: 1px solid rgb(var(--card-border-rgb)); */
+   /* The card styles themselves should handle most layout */
+}
+
+.error {
+  color: rgb(var(--error-rgb));
+  margin-top: 1rem;
+}

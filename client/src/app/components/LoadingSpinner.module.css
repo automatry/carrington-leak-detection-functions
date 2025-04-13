@@ -1,33 +1,55 @@
 /* components/LoadingSpinner.module.css */
-.fullPageContainer {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh; /* Full viewport height */
-    background-color: rgba(var(--background-rgb), 0.8); /* Optional semi-transparent background */
+
+/* Base spinner styles */
+.spinner {
+  display: inline-block; /* Allows it to sit alongside text */
+  border-style: solid;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  border-color: rgba(var(--foreground-rgb), 0.2); /* Lighter track color */
+  border-top-color: rgb(var(--primary-rgb)); /* Spinning accent color */
+  vertical-align: middle; /* Align nicely with text */
+}
+
+/* Size variants */
+.small {
+  width: 1em; /* Relative to parent font size */
+  height: 1em;
+  border-width: 2px;
+}
+
+.medium {
+  width: 2rem; /* Fixed size */
+  height: 2rem;
+  border-width: 3px;
+}
+
+.large {
+  width: 4rem; /* Fixed size */
+  height: 4rem;
+  border-width: 4px;
+}
+
+/* Spin animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
-  
-  .inlineContainer {
-   display: flex;
-   flex-direction: column;
-   justify-content: center;
-   align-items: center;
-   padding: 2rem;
-  }
-  
-  .spinner {
-    border: 4px solid rgba(var(--foreground-rgb), 0.3); /* Light border */
-    border-left-color: rgb(var(--primary-rgb)); /* Accent color for spinning part */
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    animation: spin 1s linear infinite;
-    margin-bottom: 1rem;
-  }
-  
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
+}
+
+/* Hide text meant only for screen readers */
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap; /* Keep text on one line */
+  border: 0;
+}
+
+/* Remove old container styles if they exist */
+/* .fullPageContainer { ... } */
+/* .inlineContainer { ... } */
