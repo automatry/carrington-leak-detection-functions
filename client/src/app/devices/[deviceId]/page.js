@@ -21,12 +21,10 @@ export default function DeviceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  // --- NEW STATE FOR DELETE ---
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
-  // --- END NEW STATE ---
+  const [isApproving, setIsApproving] = useState(false);
 
-  // Fetch initial data and set up listener (useEffect remains the same as before)
   useEffect(() => {
     if (!deviceId) {
       setError("Device ID not found in URL.");
@@ -35,7 +33,7 @@ export default function DeviceDetailPage() {
     }
     setLoading(true);
     setError(null);
-    setDeleteError(null); // Clear delete error on load
+    setDeleteError(null); 
     console.log(`Setting up snapshot listener for device: ${deviceId}`);
     const docRef = doc(db, 'devices', deviceId);
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
@@ -60,17 +58,17 @@ export default function DeviceDetailPage() {
     }
   }, [deviceId]);
 
-  // --- Save Handler --- (useCallback remains the same)
   const handleSaveConfig = useCallback(async (updatedConfigData) => {
       if (!deviceId) return;
       console.log("Attempting to save config for device:", deviceId, updatedConfigData);
       const docRef = doc(db, 'devices', deviceId);
       try {
+          const isCommissioned = updatedConfigData.identity.commissioned;
           await updateDoc(docRef, {
               'identity': updatedConfigData.identity,
               'config': updatedConfigData.config,
-              'state.lastUpdate': new Date() // Firestore server timestamp is better if possible
-              // 'state.lastUpdate': admin.firestore.FieldValue.serverTimestamp() // Only works backend
+              'approvedForProvisioning': deviceData?.approvedForProvisioning || isCommissioned,
+              'state.lastUpdate': new Date()
           });
           console.log("Device config updated successfully!");
           setIsEditing(false);
@@ -78,15 +76,43 @@ export default function DeviceDetailPage() {
           console.error("Error updating device config:", err);
           setError(`Failed to save configuration: ${err.message}`);
       }
-  }, [deviceId]);
+  }, [deviceId, deviceData]);
 
-  // --- NEW DELETE HANDLER ---
+  const handleApprovalToggle = async () => {
+    if (!deviceId) return;
+
+    const newApprovalStatus = !deviceData?.approvedForProvisioning;
+    const confirmMessage = newApprovalStatus
+      ? `Are you sure you want to APPROVE registration for device "${deviceData.serial}"? The device will then download its credentials.`
+      : `Are you sure you want to REVOKE approval for device "${deviceData.serial}"?`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setIsApproving(true);
+    setError(null);
+    console.log(`Setting approvedForProvisioning to ${newApprovalStatus} for device: ${deviceId}`);
+    const docRef = doc(db, 'devices', deviceId);
+    try {
+      await updateDoc(docRef, {
+        approvedForProvisioning: newApprovalStatus,
+        provisioningStatus: newApprovalStatus ? 'approved' : 'awaiting_approval',
+      });
+      console.log("Device approval status updated successfully.");
+    } catch (err) {
+      console.error("Error updating device approval status:", err);
+      setError(`Failed to update approval: ${err.message}`);
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
   const handleDeleteDevice = async () => {
-      if (!deviceId || !deviceData?.serial) return; // Need ID and serial for confirm message
+      if (!deviceId || !deviceData?.serial) return; 
 
-      // Confirmation dialog
       if (!window.confirm(`Are you sure you want to permanently delete device "${deviceData.serial}" (ID: ${deviceId})? This action cannot be undone.`)) {
-          return; // User cancelled
+          return; 
       }
 
       setIsDeleting(true);
@@ -97,29 +123,23 @@ export default function DeviceDetailPage() {
           const docRef = doc(db, 'devices', deviceId);
           await deleteDoc(docRef);
           console.log(`Device ${deviceId} deleted successfully.`);
-          // Navigate back to the device list after successful deletion
           router.push('/devices');
-          // No need to setLoading(false) or setIsDeleting(false) as we are navigating away
       } catch (err) {
           console.error(`Error deleting device ${deviceId}:`, err);
           setDeleteError(`Failed to delete device: ${err.message}`);
-          setIsDeleting(false); // Re-enable button on error
+          setIsDeleting(false); 
       }
   };
-  // --- END NEW DELETE HANDLER ---
 
-  // --- Render Logic ---
-  if (loading) return <AuthGuard><LoadingSpinner /></AuthGuard>; // Show full page spinner
+  if (loading) return <AuthGuard><LoadingSpinner /></AuthGuard>; 
 
   return (
     <AuthGuard>
       <div className={styles.container}>
-        {/* Back Button */}
         <button onClick={() => router.push('/devices')} className="button button-secondary" style={{ marginBottom: '1.5rem' }}>
             ← Back to Devices
         </button>
 
-        {/* Display general errors */}
         {error && !isEditing && <p className="error-message">{error}</p>}
 
         {!deviceData && !loading && !error && (
@@ -129,49 +149,56 @@ export default function DeviceDetailPage() {
         {deviceData && (
           <>
             {!isEditing ? (
-              // --- View Mode ---
               <>
                 <DeviceDetailView device={deviceData} />
-                {/* Actions Area */}
-                <div className={styles.actionsContainer} style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent:'flex-end' }}>
-                   {/* Display delete errors */}
+                <div className={styles.actionsContainer} style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent:'flex-end', flexWrap: 'wrap' }}>
                    {deleteError && <p className="error-message" style={{margin: 0, alignSelf:'center', flexGrow:1}}>{deleteError}</p>}
-                   {/* Delete Button */}
+                   
+                   {/* Tweaked Approval Button Logic/Text */ }
+                   {deviceData.provisioningStatus !== 'provisioning_complete' && (
+                     <button
+                       onClick={handleApprovalToggle}
+                       className={`button ${deviceData.approvedForProvisioning ? 'button-secondary' : ''}`}
+                       disabled={isApproving || isDeleting}
+                       style={deviceData.approvedForProvisioning ? {} : {backgroundColor: 'rgb(var(--success-rgb))'}}
+                     >
+                       {isApproving ? 'Updating...' : (deviceData.approvedForProvisioning ? 'Revoke Approval' : 'Approve Registration')}
+                     </button>
+                   )}
+                   
                    <button
                      onClick={handleDeleteDevice}
-                     className="button button-danger" // Use a danger style
-                     disabled={isDeleting}
-                     style={{backgroundColor: 'rgb(var(--error-rgb))'}} // Inline style for emphasis
+                     className="button button-danger" 
+                     disabled={isDeleting || isApproving}
+                     style={{backgroundColor: 'rgb(var(--error-rgb))'}}
                    >
                      {isDeleting ? 'Deleting...' : 'Delete Device'}
                    </button>
-                   {/* Edit Button */}
+                   
                    <button
                      onClick={() => setIsEditing(true)}
                      className="button"
-                     disabled={isDeleting} // Disable edit while deleting
+                     disabled={isDeleting || isApproving}
                    >
                      Edit Configuration
                    </button>
                 </div>
               </>
             ) : (
-              // --- Edit Mode ---
               <DeviceConfigForm
                 initialData={deviceData}
                 onSave={handleSaveConfig}
-                onCancel={() => { setError(null); setIsEditing(false); }} // Clear specific config errors on cancel
+                onCancel={() => { setError(null); setIsEditing(false); }}
               />
             )}
           </>
         )}
       </div>
-      {/* Basic error styling */}
       <style jsx>{`
         .error-message {
           color: rgb(var(--error-rgb));
           background-color: rgba(var(--error-rgb), 0.1);
-          padding: 0.8rem 1rem; /* Adjusted padding */
+          padding: 0.8rem 1rem;
           border-radius: var(--border-radius);
           border: 1px solid rgba(var(--error-rgb), 0.3);
           margin-bottom: 1.5rem;

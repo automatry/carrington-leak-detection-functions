@@ -4,7 +4,7 @@ const { onDocumentCreated } =
 const { defineSecret } = require("firebase-functions/params");
 const sgMail = require("@sendgrid/mail");
 const logger = require("firebase-functions/logger");
-const { db } = require("../firebase");
+const { db } = require("../firebaseClient");
 const { renderNotificationHTML } = require("./emailTemplates");
 
 const sendgridApiKey = defineSecret("SENDGRID_API_KEY");

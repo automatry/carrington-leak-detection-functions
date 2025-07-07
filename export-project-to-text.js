@@ -25,7 +25,7 @@ const allowedExtensions = [
   '.rules', '.sample', '.config', '.conf',
   '.sh', '.bash', '.txt', '.log', '.xml',
   'tsx', '.jsx', '.cjs', '.mjs', '.wasm',
-  '.firebaserc',
+  '.firebaserc', 
 ];
 
 function isTextFile(filePath) {

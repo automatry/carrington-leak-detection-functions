@@ -10,20 +10,20 @@
         "firebase-debug.*.log",
         "*.local",
         ".env",
-        "client"
+        ".next"
       ],
-      "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run lint"
-      ],
-      "defaultRegion": "europe-west1"
+      "predeploy": ["npm run predeploy"],
+      "defaultRegion": "europe-west1",
+      "serviceAccount": "firebase-adminsdk-fbsvc@carrington-leak-detection.iam.gserviceaccount.com"
     }
   ],
   "hosting": {
-    "public": "client/carrington-leak-detection-webapp/out",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      {
+        "source": "**",
+        "function": "nextServer"
+      }
     ]
   },
   "storage": {
@@ -38,6 +38,9 @@
     },
     "storage": {
       "port": 9199
+    },
+    "hosting": {
+      "port": 5000
     }
   },
   "firestore": {

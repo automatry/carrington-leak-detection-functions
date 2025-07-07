@@ -10,6 +10,8 @@ const { ingestLogs } = require("./src/ingestLogs");                 // HTTP
 const { getProvisionScript } = require("./src/getProvisionScript");     // HTTP
 const { notifyStatusChange } = require("./src/notifyStatusChange");     // Firestore Trigger
 const { processLogFile } = require("./src/processLogFile");         // Assumed Background Trigger (e.g., Storage)
+const { nextServer } = require("./src/next_server"); // <-- Import the Next.js server
+const { registerDevice, checkDeviceStatus } = require("./src/deviceRegistration"); // <-- NEW
 
 logger.info("Importing function modules completed.");
 
@@ -42,6 +44,14 @@ exports.getProvisionScript = onRequest({
   getProvisionScript(req, res);
 });
 
+// --- NEW Device Registration Endpoints ---
+exports.registerDevice = registerDevice;
+exports.checkDeviceStatus = checkDeviceStatus;
+// --- END NEW ---
+
+// --- NEW: Export the Next.js server function ---
+exports.nextServer = nextServer;
+
 
 // --- Background Function Exports ---
 // These functions are triggered by backend events (Firestore, Storage, Pub/Sub, etc.)
@@ -61,5 +71,5 @@ exports.processLogFile = processLogFile; // Assuming trigger is defined inside i
 
 // --- Final Log ---
 logger.info("All function handlers loaded and exported.", {
-  exportedFunctions: Object.keys(exports).join(', '),
+  exportedFunctions: Object.keys(exports).join(", "),
 });

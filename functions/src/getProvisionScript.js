@@ -4,12 +4,8 @@ const functions = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const fetch = require("node-fetch");
 const crypto = require("crypto");
-const { admin, db, rtdb} = require("../firebase");
-
-// --- NEW: Import FieldValue directly ---
+const { admin, db, rtdb } = require("../firebaseClient");
 const { FieldValue } = require("firebase-admin/firestore");
-// --- END NEW ---
-
 
 // --- Configuration ---
 const DEVICE_PROVISION_RATE_LIMIT_SECONDS = parseInt(
@@ -19,15 +15,15 @@ const DEVICE_PROVISION_RATE_LIMIT_SECONDS = parseInt(
 const IP_RATE_LIMIT_SECONDS = parseInt(process.env.IP_RATE_LIMIT_S || "5", 10);
 const RTDB_IP_LIMIT_PATH =
   process.env.RTDB_IP_LIMIT_PATH || "provisioningIpRateLimits";
-const TAILSCALE_API_KEY = process.env.TAILSCALE_API_KEY; // Loaded via secret mechanism
+const TAILSCALE_API_KEY = process.env.TAILSCALE_API_KEY;
 const TAILNET = process.env.TAILSCALE_TAILNET || "missing-tailnet.ts.net";
 const TAILSCALE_KEY_EXPIRY_SECONDS = parseInt(
   process.env.TS_KEY_EXPIRY_S || "600",
   10
 );
 const TAILSCALE_TAG = process.env.TAILSCALE_PROVISION_TAG || "tag:provisioned";
-const DEVICE_DOCKER_IMAGE = process.env.DEVICE_DOCKER_IMAGE || "alpine:latest"; // Fallback
-const FIREB_API_KEY = process.env.FIREB_API_KEY; // Loaded via secret mechanism (renamed)
+const DEVICE_DOCKER_IMAGE = process.env.DEVICE_DOCKER_IMAGE || "alpine:latest";
+const FIREB_API_KEY = process.env.FIREB_API_KEY;
 const FIREBASE_PROJECT_ID =
   process.env.GCLOUD_PROJECT || process.env.PROJECT_ID;
 const FIREBASE_AUTH_DOMAIN =
@@ -52,9 +48,7 @@ async function generateTailscaleKey(serial) {
     });
     throw new Error("Configuration Error: Tailscale Tailnet missing.");
   }
-  if (!serial) {
-    logger.warn({ message: "Serial number not provided.", functionName });
-  }
+
   const url = `https://api.tailscale.com/api/v2/tailnet/${TAILNET}/keys`;
   const body = {
     capabilities: {
@@ -69,14 +63,15 @@ async function generateTailscaleKey(serial) {
     },
     expirySeconds: TAILSCALE_KEY_EXPIRY_SECONDS,
   };
+
   logger.info({
     message: "Generating Tailscale key",
     functionName,
     tailnet: TAILNET,
     tag: TAILSCALE_TAG,
-    expiry: TAILSCALE_KEY_EXPIRY_SECONDS,
     serial,
   });
+
   try {
     const response = await fetch(url, {
       method: "POST",
@@ -86,6 +81,7 @@ async function generateTailscaleKey(serial) {
       },
       body: JSON.stringify(body),
     });
+
     if (!response.ok) {
       const errorText = await response.text();
       logger.error({
@@ -93,15 +89,13 @@ async function generateTailscaleKey(serial) {
         functionName,
         serial,
         status: response.status,
-        statusText: response.statusText,
-        url,
         errorBody: errorText,
-        requestBody: body,
       });
       throw new Error(
         `Tailscale API error (${response.status}): ${response.statusText}`
       );
     }
+
     const data = await response.json();
     if (!data.key) {
       logger.error({
@@ -112,6 +106,7 @@ async function generateTailscaleKey(serial) {
       });
       throw new Error("Tailscale API did not return an auth key.");
     }
+
     logger.info({
       message: "Tailscale key generated successfully.",
       functionName,
@@ -126,7 +121,6 @@ async function generateTailscaleKey(serial) {
       serial,
       error: error.message,
       stack: error.stack,
-      url,
     });
     throw error;
   }
@@ -145,12 +139,8 @@ function sanitizeIpForKey(ip) {
     .replace(/:/g, "-");
 }
 
-// --- Cloud Function Definition ---
 exports.getProvisionScript = functions.onRequest(
-  {
-    region: "europe-west1",
-    secrets: ["TAILSCALE_API_KEY", "FIREB_API_KEY"], // Renamed API key secret
-  },
+  { region: "europe-west1", secrets: ["TAILSCALE_API_KEY", "FIREB_API_KEY"] },
   async (req, res) => {
     const functionName = "getProvisionScript";
     const startTimestamp = Date.now();
@@ -158,69 +148,42 @@ exports.getProvisionScript = functions.onRequest(
       message: "Function execution started.",
       functionName,
       method: req.method,
-      path: req.path,
       ip: req.ip,
-      emulator: process.env.FUNCTIONS_EMULATOR,
     });
 
-    // Method Check / IP Rate Limit (Same as before)
     if (req.method !== "GET") {
-      logger.warn({
-        message: "Method Not Allowed.",
-        functionName,
-        requestedMethod: req.method,
-      });
       res.setHeader("Allow", "GET");
       return res.status(405).send("Method Not Allowed");
     }
+
     const requestIp = req.ip;
-    if (!requestIp && process.env.FUNCTIONS_EMULATOR === "true") {
-      logger.info({
-        message: "Skipping IP rate limit check (Emulator mode without IP).",
-        functionName,
-      });
-    } else if (!requestIp) {
-      logger.error({
-        message:
-          "Could not determine request IP address in non-emulator environment.",
-        functionName,
-      });
-      return res.status(400).send("Could not identify requester IP address.");
-    } else {
-      /* ... IP rate limit check logic ... */
+    if (requestIp) {
       const sanitizedIp = sanitizeIpForKey(requestIp);
       const ipRateLimitRef = rtdb.ref(`${RTDB_IP_LIMIT_PATH}/${sanitizedIp}`);
-      // logger.info({ message: "Checking IP rate limit.", functionName, requestIp, sanitizedIp });
       try {
         const ipSnapshot = await ipRateLimitRef.once("value");
         const lastRequestTimestamp = ipSnapshot.val();
-        const now = Date.now();
         if (
           lastRequestTimestamp &&
-          (now - lastRequestTimestamp) / 1000 < IP_RATE_LIMIT_SECONDS
+          (Date.now() - lastRequestTimestamp) / 1000 < IP_RATE_LIMIT_SECONDS
         ) {
           logger.warn({
             message: "IP Rate Limit hit.",
             functionName,
             requestIp,
-            sanitizedIp,
-            limitSeconds: IP_RATE_LIMIT_SECONDS,
           });
           res.setHeader("Retry-After", String(IP_RATE_LIMIT_SECONDS));
           return res
             .status(429)
-            .send("Too many requests from this IP address. Please wait.");
+            .send("Too many requests from this IP address.");
         }
         await ipRateLimitRef.set(Date.now());
-        // logger.info({ message: "IP rate limit check passed, timestamp updated.", functionName, requestIp, sanitizedIp });
       } catch (error) {
         logger.error({
-          message: "Error during IP rate limit check/update.",
+          message: "Error during IP rate limit check.",
           functionName,
           requestIp,
-          sanitizedIp,
           error: error.message,
-          stack: error.stack,
         });
         return res
           .status(500)
@@ -228,25 +191,17 @@ exports.getProvisionScript = functions.onRequest(
       }
     }
 
-    // Device Lookup (Firestore)
     const deviceHash = req.query.device_hash;
-    if (!deviceHash) {
+    if (!deviceHash || !/^[a-f0-9]{64}$/i.test(deviceHash)) {
       logger.warn({
-        message: "Missing 'device_hash' query parameter.",
-        functionName,
-        requestIp,
-      });
-      return res.status(400).send("Missing 'device_hash' query parameter.");
-    }
-    if (!/^[a-f0-9]{64}$/i.test(deviceHash)) {
-      logger.warn({
-        message: "Invalid 'device_hash' format.",
+        message: "Invalid or missing 'device_hash' parameter.",
         functionName,
         requestIp,
         providedHash: deviceHash,
       });
       return res.status(400).send("Invalid 'device_hash' format.");
     }
+
     const hashPrefix = deviceHash.substring(0, 8);
     logger.info({
       message: "Looking up device by hash.",
@@ -274,46 +229,55 @@ exports.getProvisionScript = functions.onRequest(
 
       const doc = snapshot.docs[0];
       const deviceData = doc.data();
-      const deviceId = doc.id;
-      const serial = deviceData.serial;
+      const {
+        id: deviceId,
+        serial,
+        approvedForProvisioning,
+        lastProvisionRequest,
+      } = deviceData;
+
+      if (approvedForProvisioning !== true) {
+        logger.warn({
+          message: "Device provisioning request denied (not approved).",
+          functionName,
+          deviceId,
+          serial,
+        });
+        await doc.ref.update({
+          provisioningStatus: "approval_pending_request_received",
+        });
+        return res
+          .status(403)
+          .send("Unauthorized: Device provisioning has not been approved.");
+      }
+      logger.info({
+        message: "Device is approved for provisioning.",
+        functionName,
+        deviceId,
+      });
 
       if (!serial) {
         logger.error({
           message: "Device document missing 'serial' field.",
           functionName,
-          requestIp,
           deviceId,
-          hashPrefix,
         });
         return res
           .status(500)
           .send("Internal configuration error: Device serial missing.");
       }
-      logger.info({
-        message: "Device found.",
-        functionName,
-        requestIp,
-        deviceId,
-        serial,
-        hashPrefix,
-      });
+      logger.info({ message: "Device found.", functionName, deviceId, serial });
 
-      // Per-Device Rate Limiting
-      const lastProvisionRequest = deviceData.lastProvisionRequest?.toDate();
-      const nowForDeviceCheck = new Date();
       if (
         lastProvisionRequest &&
-        (nowForDeviceCheck - lastProvisionRequest) / 1000 <
+        (new Date() - lastProvisionRequest.toDate()) / 1000 <
           DEVICE_PROVISION_RATE_LIMIT_SECONDS
       ) {
         logger.warn({
           message: "Device Rate Limit hit.",
           functionName,
-          requestIp,
           deviceId,
           serial,
-          limitSeconds: DEVICE_PROVISION_RATE_LIMIT_SECONDS,
-          lastAttempt: lastProvisionRequest.toISOString(),
         });
         res.setHeader(
           "Retry-After",
@@ -322,146 +286,127 @@ exports.getProvisionScript = functions.onRequest(
         return res
           .status(429)
           .send(
-            `Provisioning for device ${serial} already requested recently. Please wait.`
+            "Provisioning for this device was requested recently. Please wait."
           );
       }
-      logger.info({
-        message: "Device rate limit check passed.",
-        functionName,
-        deviceId,
-        serial,
-      });
 
-      // Generate Provisioning Instance UUID & Update Firestore
       const provisioningInstanceUuid = crypto.randomUUID();
-      const updateData = {
+      await doc.ref.update({
         provisioningStatus: "script_generated",
-        lastProvisionRequest: FieldValue.serverTimestamp(), // Use imported FieldValue
+        lastProvisionRequest: FieldValue.serverTimestamp(),
         uuid: provisioningInstanceUuid,
         lastProvisionIP: requestIp || "emulator",
-      };
-      await doc.ref.update(updateData);
+      });
       logger.info({
         message: "Updated device status in Firestore.",
         functionName,
         deviceId,
         serial,
-        status: "script_generated",
-        provisioningInstanceUuid,
       });
 
-      // Generate Auth Credentials
-      const firebaseUid = deviceId;
-      const customTokenClaims = {
-        serial: serial,
-        provisioningInstanceUuid: provisioningInstanceUuid,
-        deviceId: deviceId,
-      };
-      logger.debug({
-        message: "Attempting to create custom token",
-        functionName,
-        firebaseUid,
-        customTokenClaims,
-      });
-      const firebaseToken = await admin
-        .auth()
-        .createCustomToken(firebaseUid, customTokenClaims);
-      logger.info({
-        message: "Generated Firebase custom token.",
-        functionName,
-        deviceId,
-        serial,
-        firebaseUid,
-      });
+      // --- Custom Token Generation with Specific Error Handling ---
+      let firebaseToken;
+      try {
+        const firebaseUid = deviceId;
+        const customTokenClaims = {
+          serial,
+          provisioningInstanceUuid,
+          deviceId,
+        };
+        logger.info({
+          message: "Attempting to create Firebase custom token.",
+          functionName,
+          firebaseUid,
+          customTokenClaims,
+        });
+        firebaseToken = await admin
+          .auth()
+          .createCustomToken(firebaseUid, customTokenClaims);
+        logger.info({
+          message: "Generated Firebase custom token successfully.",
+          functionName,
+          deviceId,
+        });
+      } catch (tokenError) {
+        // This will now catch the specific IAM permission error and log it clearly.
+        logger.error({
+          message:
+            "FATAL: Failed to create Firebase custom token. This is likely an IAM permission issue.",
+          functionName,
+          deviceId,
+          error: tokenError.message,
+          code: tokenError.code,
+          suggestion:
+            "Ensure the function's service account has the 'Service Account Token Creator' role.",
+        });
+        throw tokenError; // Re-throw to be caught by the main catch block and return a 500 error.
+      }
+      // --- End Custom Token Generation ---
 
-      // Generate Tailscale Key
       const tailscaleKey = await generateTailscaleKey(serial);
-
-      logger.debug({
-        message: "Preparing to replace script placeholders. Values:",
-        functionName,
-        DEVICE_DOCKER_IMAGE_CONST: DEVICE_DOCKER_IMAGE,
-        DEVICE_DOCKER_IMAGE_ENV: process.env.DEVICE_DOCKER_IMAGE,
-      });
-
-      // --- Construct Provisioning Script using Placeholders ---
-      // Define JS variable for container name
       const containerName = "bacnet-service";
 
-      /* eslint-disable no-undef, no-eval */
+      // --- Corrected Bash Script Template ---
       const scriptTemplate = `#!/bin/bash
-set -e # Exit on error
-set -u # Error on unset variables
-# set -x # Uncomment for debug tracing
+set -e
+set -u
+# set -x # Uncomment for deep debug tracing
 
-# --- Logging Helper ---
-log_action() { echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] $1"; }
+log_action() { echo "[PROV-SCRIPT] [$(date -u +"%Y-%m-%dT%H:%M:%SZ")] $1"; }
 
-log_action "🚀 Starting Provisioning Process"
-log_action "   Device Serial: __SERIAL__"
-log_action "   Firestore Device ID / Firebase UID: __DEVICE_ID__"
-log_action "   Provisioning Instance UUID: __PROVISIONING_INSTANCE_UUID__"
-log_action "   Run Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+log_action "--- 🚀 Starting Full Provisioning Process ---"
+log_action "Device Serial: __SERIAL__"
+log_action "Firestore Device ID / Firebase UID: __DEVICE_ID__"
+log_action "Provisioning Instance UUID: __PROVISIONING_INSTANCE_UUID__"
 
-# --- Configuration (Injected by Cloud Function) ---
 export DEVICE_SERIAL="__SERIAL__"
 export DEVICE_ID="__DEVICE_ID__"
 export PROVISIONING_INSTANCE_UUID="__PROVISIONING_INSTANCE_UUID__"
 export FIREBASE_UID="__FIREBASE_UID__"
 export FIREBASE_CUSTOM_TOKEN="__FIREBASE_CUSTOM_TOKEN__"
-export FIREBASE_API_KEY="__FIREB_API_KEY__" # Use renamed variable
+export FIREBASE_API_KEY="__FIREB_API_KEY__"
 export FIREBASE_PROJECT_ID="__FIREBASE_PROJECT_ID__"
 export FIREBASE_AUTH_DOMAIN="__FIREBASE_AUTH_DOMAIN__"
 export DOCKER_IMAGE="__DOCKER_IMAGE__"
 
-# --- Dependency Installation Function ---
 install_if_missing() {
     local pkg_name=$1
     local install_cmd=$2
     if ! command -v "$pkg_name" &> /dev/null; then
-        log_action "$pkg_name not found. Installing..."
-        eval "$install_cmd"
-        log_action "$pkg_name installed successfully."
+        log_action "Dependency '$pkg_name' not found. Installing..."
+        sudo apt-get update -y && sudo apt-get install -y "$install_cmd"
     else
-        log_action "$pkg_name is already installed."
+        log_action "Dependency '$pkg_name' is already installed."
     fi
 }
 
-# --- Install Core Dependencies ---
-install_if_missing "docker" "curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh && rm get-docker.sh"
-install_if_missing "tailscale" "curl -fsSL https://tailscale.com/install.sh | sh"
+install_if_missing "docker" "docker.io"
+install_if_missing "tailscale" "tailscale"
 
-# --- Service Management (Ensure Docker is running) ---
-if ! systemctl is-active --quiet docker; then log_action "Starting Docker service..."; systemctl start docker; fi
-if ! systemctl is-enabled --quiet docker; then log_action "Enabling Docker service to start on boot..."; systemctl enable docker; fi
+log_action "Ensuring Docker service is active and enabled."
+sudo systemctl enable --now docker
 
-# --- Tailscale Configuration ---
 log_action "Configuring Tailscale and connecting to tailnet..."
-tailscale up \\
-    --authkey "__TAILSCALE_KEY__" \\
-    --hostname "__SERIAL__" \\
+sudo tailscale up \\
+    --authkey="__TAILSCALE_KEY__" \\
+    --hostname="__SERIAL__" \\
     --accept-routes
 log_action "Tailscale configured and connected."
 
-# --- Docker Container Setup ---
-# Use escaped \${DOCKER_IMAGE} for Bash variable expansion
 log_action "Pulling required Docker image: \${DOCKER_IMAGE}..."
-docker pull "\${DOCKER_IMAGE}"
+sudo docker pull "\${DOCKER_IMAGE}"
 
-# Define the container name variable in Bash
 CONTAINER_NAME="__CONTAINER_NAME_VAR__"
 
-# Use escaped \${CONTAINER_NAME} for Bash variable expansion
 log_action "Stopping and removing any existing container named '\${CONTAINER_NAME}'..."
-docker stop "\${CONTAINER_NAME}" > /dev/null 2>&1 || true
-docker rm "\${CONTAINER_NAME}" > /dev/null 2>&1 || true
+sudo docker stop "\${CONTAINER_NAME}" > /dev/null 2>&1 || true
+sudo docker rm "\${CONTAINER_NAME}" > /dev/null 2>&1 || true
 
-log_action "Starting Docker container '\${CONTAINER_NAME}'..."
-docker run -d \\
-    --name "\${CONTAINER_NAME}" \\ # Use Bash variable for --name
+log_action "Starting new Docker container '\${CONTAINER_NAME}'..."
+sudo docker run -d \\
+    --name "\${CONTAINER_NAME}" \\
     --restart=always \\
     --network=host \\
-    # Pass exported variables into the container's environment
     -e DEVICE_SERIAL \\
     -e DEVICE_ID \\
     -e PROVISIONING_INSTANCE_UUID \\
@@ -470,26 +415,19 @@ docker run -d \\
     -e FIREBASE_API_KEY \\
     -e FIREBASE_PROJECT_ID \\
     -e FIREBASE_AUTH_DOMAIN \\
-    -e DOCKER_IMAGE \\ # Pass DOCKER_IMAGE into container env if needed
-    "\${DOCKER_IMAGE}" # Use Bash variable for the image name
+    -e DOCKER_IMAGE \\
+    "\${DOCKER_IMAGE}"
 
 log_action "Docker container '\${CONTAINER_NAME}' started."
-
-# --- Final Steps & Cleanup ---
-log_action "✅ Provisioning script execution completed."
-log_action "   Container '\${CONTAINER_NAME}' is starting in the background."
-log_action "   Monitor container logs ('docker logs \${CONTAINER_NAME}') and Firebase Firestore for operational status updates."
-
+log_action "--- ✅ Provisioning script execution completed. ---"
 exit 0
-`; // End of script template
-      /* eslint-enable no-undef, no-eval */
+`;
 
-      // --- Replace Placeholders in Template ---
       const script = scriptTemplate
         .replace(/__SERIAL__/g, serial)
         .replace(/__DEVICE_ID__/g, deviceId)
         .replace(/__PROVISIONING_INSTANCE_UUID__/g, provisioningInstanceUuid)
-        .replace(/__FIREBASE_UID__/g, firebaseUid)
+        .replace(/__FIREBASE_UID__/g, deviceId) // Firebase UID is the deviceId
         .replace(/__FIREBASE_CUSTOM_TOKEN__/g, firebaseToken)
         .replace(
           /__FIREB_API_KEY__/g,
@@ -503,9 +441,9 @@ exit 0
           /__FIREBASE_AUTH_DOMAIN__/g,
           FIREBASE_AUTH_DOMAIN || "MISSING_AUTH_DOMAIN_IN_ENV"
         )
-        .replace(/__DOCKER_IMAGE__/g, DEVICE_DOCKER_IMAGE) // Replace Docker image placeholder
+        .replace(/__DOCKER_IMAGE__/g, DEVICE_DOCKER_IMAGE)
         .replace(/__TAILSCALE_KEY__/g, tailscaleKey)
-        .replace(/__CONTAINER_NAME_VAR__/g, containerName); // Replace container name placeholder
+        .replace(/__CONTAINER_NAME_VAR__/g, containerName);
 
       logger.info({
         message: "Provisioning script generated successfully.",
@@ -514,7 +452,6 @@ exit 0
         serial,
       });
 
-      // Return Script
       res.setHeader("Content-Type", "text/x-shellscript");
       res.setHeader(
         "Content-Disposition",

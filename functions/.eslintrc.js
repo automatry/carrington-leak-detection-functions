@@ -11,14 +11,13 @@ module.exports = {
     "eslint:recommended",
   ],
   rules: {
-    // Reduced restrictions
-    "no-restricted-globals": "off",
-    "prefer-arrow-callback": "warn",
+    // Only basic linting rules
+    "no-unused-vars": "warn",
+    "no-undef": "warn",
+    "no-console": "off",
     "quotes": ["warn", "double", { allowTemplateLiterals: true }],
-    "linebreak-style": "off",
-    "no-trailing-spaces": "warn",
-    "indent": ["warn", 2],
-    "object-curly-spacing": ["warn", "always"],
+    "semi": ["warn", "always"],
+    "eqeqeq": "warn"
   },
   overrides: [
     {

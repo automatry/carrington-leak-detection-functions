@@ -1,5 +1,5 @@
 const { onObjectFinalized } = require("firebase-functions/v2/storage");
-const { storage, bigquery } = require("../firebase");
+const { storage, bigquery } = require("../firebaseClient");
 const logger = require("firebase-functions/logger");
 require("dotenv").config();
 
