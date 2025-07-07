@@ -70,3 +70,9 @@ node_modules/
 
 #Ignore keys
 */keys/
+
+# Ignore Firebase functions build artifacts
+functions/node_modules/
+project-export.txt
+functions/.next
+client/.next
