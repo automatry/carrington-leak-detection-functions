@@ -4,7 +4,7 @@ const fs = require("fs"); // Import filesystem module to check file existence
 
 // --- FORCE PATH FOR TESTING ---
 // Hardcode the correct path with forward slashes for testing
-const explicitServiceAccountPath = "C:/.gcp/service-accounts/carrington-leak-detection-69c3bfacbc1e.json"; // Use your actual path
+const explicitServiceAccountPath = "C:/Code/carrington-leak-detection-cloud/functions/keys/carrington-leak-detection-firebase-adminsdk-fbsvc-106694876f.json"; // Use your actual path
 console.log("Attempting to force service account path:", explicitServiceAccountPath);
 // --- END FORCE PATH ---
 
