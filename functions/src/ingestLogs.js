@@ -4,9 +4,20 @@ const { BigQuery } = require("@google-cloud/bigquery");
 require("dotenv").config();
 
 const FORCE_NO_TOKEN_CHECK = process.env.FORCE_NO_TOKEN_CHECK === "true";
-const ACCESS_TOKEN = process.env.DEVICE_UPDATE_TOKEN ||
- functions.config().device.updatetoken;
-
+// Fix: Safely access functions.config().device.updatetoken
+let ACCESS_TOKEN = process.env.DEVICE_UPDATE_TOKEN;
+try {
+  if (!ACCESS_TOKEN && typeof functions.config === "function") {
+    const config = functions.config();
+    if (config.device && config.device.updatetoken) {
+      ACCESS_TOKEN = config.device.updatetoken;
+    }
+  }
+} catch (e) {
+  // If functions.config() is not available, ignore
+  console.log("functions.config() not available, using environment variable for access token.");
+  console.log(e);
+}
 
 const DATASET_ID = process.env.BQ_DATASET_ID || "leak_detection";
 const TABLE_ID = process.env.BQ_TABLE_ID || "device_logs";
