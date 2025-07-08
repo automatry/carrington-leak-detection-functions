@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 // functions/src/getProvisionScript.js
 
 const functions = require("firebase-functions/v2/https");
@@ -36,11 +37,8 @@ async function generateTailscaleKey(serial) {
   const functionName = "generateTailscaleKey";
   if (!TAILSCALE_API_KEY) {
     logger.error({
-      message:
-        "Tailscale API key (TAILSCALE_API_KEY secret) is not configured.",
+      message: "Tailscale API key (TAILSCALE_API_KEY) is not configured.",
       functionName,
-      suggestion:
-        "Ensure the secret is populated with a valid Tailscale API Key (starts with tskey-api-).",
     });
     throw new Error("Configuration Error: Tailscale API key missing.");
   }
@@ -53,14 +51,13 @@ async function generateTailscaleKey(serial) {
   }
 
   const url = `https://api.tailscale.com/api/v2/tailnet/${TAILNET}/keys`;
-
   const body = {
     capabilities: {
       devices: {
         create: {
-          reusable: false,
-          ephemeral: false,
           preauthorized: true,
+          ephemeral: false,
+          reusable: false,
           tags: [TAILSCALE_TAG],
         },
       },
@@ -69,10 +66,10 @@ async function generateTailscaleKey(serial) {
   };
 
   logger.info({
-    message: "Generating Tailscale Auth Key",
+    message: "Generating Tailscale key",
     functionName,
     tailnet: TAILNET,
-    requestBody: body,
+    tag: TAILSCALE_TAG,
     serial,
   });
 
@@ -86,34 +83,33 @@ async function generateTailscaleKey(serial) {
       body: JSON.stringify(body),
     });
 
-    const responseText = await response.text();
-
     if (!response.ok) {
+      const errorText = await response.text();
       logger.error({
         message: "Tailscale API error generating auth key.",
         functionName,
         serial,
         status: response.status,
-        errorBody: responseText,
+        errorBody: errorText,
       });
       throw new Error(
-        `Tailscale API error (${response.status}): ${responseText}`
+        `Tailscale API error (${response.status}): ${response.statusText}`
       );
     }
 
-    const data = JSON.parse(responseText);
-    if (!data.key || !data.key.startsWith("tskey-auth-")) {
+    const data = await response.json();
+    if (!data.key) {
       logger.error({
-        message: "Tailscale API response did not contain a valid Auth Key.",
+        message: "Tailscale API response missing 'key'.",
         functionName,
         serial,
         responseData: data,
       });
-      throw new Error("Tailscale API did not return a valid auth key.");
+      throw new Error("Tailscale API did not return an auth key.");
     }
 
     logger.info({
-      message: "Tailscale Auth Key generated successfully.",
+      message: "Tailscale key generated successfully.",
       functionName,
       serial,
       keyId: data.id,
@@ -121,8 +117,7 @@ async function generateTailscaleKey(serial) {
     return data.key;
   } catch (error) {
     logger.error({
-      message:
-        "Failed to generate Tailscale auth key due to an API interaction error.",
+      message: "Failed to generate Tailscale key due to API interaction error.",
       functionName,
       serial,
       error: error.message,
@@ -164,20 +159,21 @@ exports.getProvisionScript = functions.onRequest(
 
     const requestIp = req.ip;
     if (requestIp) {
-      const ipRateLimitRef = rtdb.ref(
-        `${RTDB_IP_LIMIT_PATH}/${sanitizeIpForKey(requestIp)}`
-      );
+      const sanitizedIp = sanitizeIpForKey(requestIp);
+      const ipRateLimitRef = rtdb.ref(`${RTDB_IP_LIMIT_PATH}/${sanitizedIp}`);
       try {
         const ipSnapshot = await ipRateLimitRef.once("value");
+        const lastRequestTimestamp = ipSnapshot.val();
         if (
-          ipSnapshot.val() &&
-          (Date.now() - ipSnapshot.val()) / 1000 < IP_RATE_LIMIT_SECONDS
+          lastRequestTimestamp &&
+          (Date.now() - lastRequestTimestamp) / 1000 < IP_RATE_LIMIT_SECONDS
         ) {
           logger.warn({
             message: "IP Rate Limit hit.",
             functionName,
             requestIp,
           });
+          res.setHeader("Retry-After", String(IP_RATE_LIMIT_SECONDS));
           return res
             .status(429)
             .send("Too many requests from this IP address.");
@@ -207,6 +203,14 @@ exports.getProvisionScript = functions.onRequest(
       return res.status(400).send("Invalid 'device_hash' format.");
     }
 
+    const hashPrefix = deviceHash.substring(0, 8);
+    logger.info({
+      message: "Looking up device by hash.",
+      functionName,
+      requestIp,
+      hashPrefix,
+    });
+
     try {
       const devicesRef = db.collection("devices");
       const snapshot = await devicesRef
@@ -219,7 +223,7 @@ exports.getProvisionScript = functions.onRequest(
           message: "Device hash not found.",
           functionName,
           requestIp,
-          hashPrefix: deviceHash.substring(0, 8),
+          hashPrefix,
         });
         return res.status(403).send("Unauthorized device: Hash not found.");
       }
@@ -244,6 +248,11 @@ exports.getProvisionScript = functions.onRequest(
           .status(403)
           .send("Unauthorized: Device provisioning has not been approved.");
       }
+      logger.info({
+        message: "Device is approved for provisioning.",
+        functionName,
+        deviceId,
+      });
 
       if (!serial) {
         logger.error({
@@ -255,6 +264,7 @@ exports.getProvisionScript = functions.onRequest(
           .status(500)
           .send("Internal configuration error: Device serial missing.");
       }
+      logger.info({ message: "Device found.", functionName, deviceId, serial });
 
       if (
         lastProvisionRequest &&
@@ -267,6 +277,10 @@ exports.getProvisionScript = functions.onRequest(
           deviceId,
           serial,
         });
+        res.setHeader(
+          "Retry-After",
+          String(DEVICE_PROVISION_RATE_LIMIT_SECONDS)
+        );
         return res
           .status(429)
           .send(
@@ -281,144 +295,149 @@ exports.getProvisionScript = functions.onRequest(
         uuid: provisioningInstanceUuid,
         lastProvisionIP: requestIp || "emulator",
       });
+      logger.info({
+        message: "Updated device status in Firestore.",
+        functionName,
+        deviceId,
+        serial,
+      });
 
-      const firebaseToken = await admin
-        .auth()
-        .createCustomToken(deviceId, {
+      // --- Custom Token Generation with Specific Error Handling ---
+      let firebaseToken;
+      try {
+        const firebaseUid = deviceId;
+        const customTokenClaims = {
           serial,
           provisioningInstanceUuid,
           deviceId,
+        };
+        logger.info({
+          message: "Attempting to create Firebase custom token.",
+          functionName,
+          firebaseUid,
+          customTokenClaims,
         });
-      const tailscaleAuthKey = await generateTailscaleKey(serial);
+        firebaseToken = await admin
+          .auth()
+          .createCustomToken(firebaseUid, customTokenClaims);
+        logger.info({
+          message: "Generated Firebase custom token successfully.",
+          functionName,
+          deviceId,
+        });
+      } catch (tokenError) {
+        // This will now catch the specific IAM permission error and log it clearly.
+        logger.error({
+          message:
+            "FATAL: Failed to create Firebase custom token. This is likely an IAM permission issue.",
+          functionName,
+          deviceId,
+          error: tokenError.message,
+          code: tokenError.code,
+          suggestion:
+            "Ensure the function's service account has the 'Service Account Token Creator' role.",
+        });
+        throw tokenError; // Re-throw to be caught by the main catch block and return a 500 error.
+      }
+      // --- End Custom Token Generation ---
+
+      const tailscaleKey = await generateTailscaleKey(serial);
       const containerName = "bacnet-service";
 
-      const scriptLines = [
-        "#!/bin/bash",
-        "set -euo pipefail",
-        "log_action() { echo \"[PROV-SCRIPT] [$(date -u +'%Y-%m-%dT%H:%M:%SZ')] $1\"; }",
-        'log_action "--- 🚀 Starting Full Provisioning Process ---"',
-        "export DEBIAN_FRONTEND=noninteractive",
-        'export DEVICE_SERIAL="__SERIAL__"',
-        'export DEVICE_ID="__DEVICE_ID__"',
-        'export PROVISIONING_INSTANCE_UUID="__PROVISIONING_INSTANCE_UUID__"',
-        'export FIREBASE_UID="__FIREBASE_UID__"',
-        'export FIREBASE_CUSTOM_TOKEN="__FIREBASE_CUSTOM_TOKEN__"',
-        'export FIREBASE_API_KEY="__FIREB_API_KEY__"',
-        'export FIREBASE_PROJECT_ID="__FIREBASE_PROJECT_ID__"',
-        'export FIREBASE_AUTH_DOMAIN="__FIREBASE_AUTH_DOMAIN__"',
-        'export DOCKER_IMAGE="__DOCKER_IMAGE__"',
-        "",
-        "## --- Helper Functions ---",
-        "start_service() {",
-        "    local service_name=$1",
-        "    if [ -d /run/systemd/system ]; then",
-        "        log_action \"Systemd detected. Starting/enabling service '${service_name}' with systemctl.\"",
-        '        sudo systemctl enable --now "${service_name}"',
-        "    else",
-        "        log_action \"No systemd detected. Starting service '${service_name}' directly.\"",
-        '        case "${service_name}" in',
-        "            sshd)",
-        "                sudo mkdir -p /run/sshd",
-        "                sudo /usr/sbin/sshd",
-        "                ;;",
-        "            docker)",
-        "                sudo dockerd > /dev/null 2>&1 &",
-        "                ;;",
-        "            tailscaled)",
-        "                sudo tailscaled > /dev/null 2>&1 &",
-        "                ;;",
-        "            nxserver.service)",
-        "                sudo /usr/NX/bin/nxserver --startup",
-        "                ;;",
-        "            *)",
-        "                log_action \"WARNING: Unknown service '${service_name}' for non-systemd environment.\"",
-        "                ;;",
-        "        esac",
-        "    fi",
-        "}",
-        "install_if_missing() {",
-        '    local pkg_name="$1"',
-        '    if ! dpkg -l | grep -q "^ii.*$pkg_name"; then',
-        "        log_action \"Package '$pkg_name' not found. Installing...\"",
-        '        sudo apt-get update -y && sudo apt-get install -y "$pkg_name"',
-        "    else",
-        "        log_action \"Package '$pkg_name' is already installed.\"",
-        "    fi",
-        "}",
-        "install_tailscale() {",
-        "    if ! command -v tailscale &> /dev/null; then",
-        '        log_action "Tailscale not found. Performing full installation..."',
-        "        install_if_missing curl curl",
-        "        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg > /dev/null",
-        "        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list | sudo tee /etc/apt/sources.list.d/tailscale.list",
-        "        sudo apt-get update",
-        "        sudo apt-get install -y tailscale",
-        "    else",
-        '        log_action "Tailscale is already installed."',
-        "    fi",
-        "}",
-        "",
-        "## --- Dependency Installation ---",
-        "install_if_missing curl",
-        "install_if_missing wget",
-        "install_if_missing file",
-        "install_if_missing docker.io",
-        "install_tailscale",
-        "",
-        "## --- Service Startup: SSH ---",
-        "install_if_missing openssh-server",
-        "start_service sshd",
-        "",
-        "## --- Service Startup: NoMachine ---",
-        "ARCH=$(uname -m)",
-        'log_action "Detected Architecture: ${ARCH}"',
-        'if [[ "${ARCH}" == "x86_64" ]]; then NOMACHINE_URL="https://download.nomachine.com/download/9.0/Linux/nomachine_9.0.188_11_amd64.deb"; elif [[ "${ARCH}" == "aarch64" ]]; then NOMACHINE_URL="https://download.nomachine.com/download/9.0/Linux/nomachine_9.0.188_11_arm64.deb"; else NOMACHINE_URL=""; fi',
-        'if [[ -n "${NOMACHINE_URL}" ]]; then',
-        '  log_action "Installing NoMachine from ${NOMACHINE_URL}"',
-        "  NOMACHINE_PKG_FILE=$(mktemp /tmp/nomachine.XXXXXX.deb)",
-        '  wget --output-document="${NOMACHINE_PKG_FILE}" "${NOMACHINE_URL}"',
-        '  log_action "Validating downloaded package..."',
-        "  if file \"${NOMACHINE_PKG_FILE}\" | grep -q 'Debian binary package'; then",
-        '    log_action "Package is a valid Debian archive. Proceeding with installation."',
-        '    sudo dpkg -i "${NOMACHINE_PKG_FILE}"',
-        "    sudo apt-get install -f -y",
-        "    start_service nxserver.service",
-        "  else",
-        '    log_action "ERROR: Downloaded file is not a valid Debian package. Skipping NoMachine installation."',
-        "  fi",
-        '  rm -f "${NOMACHINE_PKG_FILE}"',
-        "fi",
-        "",
-        "## --- Service Startup: Docker & Tailscale ---",
-        "start_service docker",
-        "start_service tailscaled",
-        "sleep 5",
-        'log_action "Configuring Tailscale and connecting to tailnet..."',
-        'sudo tailscale up --authkey="__TAILSCALE_KEY__" --hostname="__SERIAL__" --accept-routes',
-        "",
-        "## --- Application Container Deployment ---",
-        'log_action "Pulling required Docker image: ${DOCKER_IMAGE}..."',
-        'sudo docker pull "${DOCKER_IMAGE}"',
-        'CONTAINER_NAME="__CONTAINER_NAME_VAR__"',
-        'if sudo docker ps -a --format \'{{.Names}}\' | grep -q "^${CONTAINER_NAME}$"; then sudo docker stop "${CONTAINER_NAME}" > /dev/null 2>&1 && sudo docker rm "${CONTAINER_NAME}" > /dev/null 2>&1; fi',
-        'sudo docker run -d --name "${CONTAINER_NAME}" --restart=always --network=host -e DEVICE_SERIAL -e DEVICE_ID -e PROVISIONING_INSTANCE_UUID -e FIREBASE_UID -e FIREBASE_CUSTOM_TOKEN -e FIREBASE_API_KEY -e FIREBASE_PROJECT_ID -e FIREBASE_AUTH_DOMAIN -e DOCKER_IMAGE "${DOCKER_IMAGE}"',
-        'log_action "--- ✅ Provisioning script execution completed. ---"',
-        "exit 0",
-      ];
+      // --- *** CORRECTED Bash Script Template *** ---
+      const scriptTemplate = `#!/bin/bash
+set -euo pipefail
+# set -x # Uncomment for deep debug tracing
 
-      const scriptTemplate = scriptLines.join("\n");
+log_action() { echo "[PROV-SCRIPT] [$(date -u +"%Y-%m-%dT%H:%M:%SZ")] $1"; }
+
+log_action "--- 🚀 Starting Full Provisioning Process ---"
+log_action "Device Serial: __SERIAL__"
+log_action "Firestore Device ID / Firebase UID: __DEVICE_ID__"
+log_action "Provisioning Instance UUID: __PROVISIONING_INSTANCE_UUID__"
+
+export DEVICE_SERIAL="__SERIAL__"
+export DEVICE_ID="__DEVICE_ID__"
+export PROVISIONING_INSTANCE_UUID="__PROVISIONING_INSTANCE_UUID__"
+export FIREBASE_UID="__FIREBASE_UID__"
+export FIREBASE_CUSTOM_TOKEN="__FIREBASE_CUSTOM_TOKEN__"
+export FIREBASE_API_KEY="__FIREB_API_KEY__"
+export FIREBASE_PROJECT_ID="__FIREBASE_PROJECT_ID__"
+export FIREBASE_AUTH_DOMAIN="__FIREBASE_AUTH_DOMAIN__"
+export DOCKER_IMAGE="__DOCKER_IMAGE__"
+
+install_if_missing() {
+    local pkg_name="$1"
+    local install_cmd="$2"
+    if ! command -v "$pkg_name" &> /dev/null; then
+        log_action "Dependency '$pkg_name' not found. Installing..."
+        sudo apt-get update -y && sudo apt-get install -y "$install_cmd"
+    else
+        log_action "Dependency '$pkg_name' is already installed."
+    fi
+}
+
+install_if_missing "docker" "docker.io"
+install_if_missing "tailscale" "tailscale"
+
+log_action "Ensuring Docker service is active and enabled."
+sudo systemctl enable --now docker
+
+log_action "Configuring Tailscale and connecting to tailnet..."
+sudo tailscale up \\
+    --authkey="__TAILSCALE_KEY__" \\
+    --hostname="__SERIAL__" \\
+    --accept-routes
+log_action "Tailscale configured and connected."
+
+log_action "Pulling required Docker image: \${DOCKER_IMAGE}..."
+sudo docker pull "\${DOCKER_IMAGE}"
+
+CONTAINER_NAME="__CONTAINER_NAME_VAR__"
+
+log_action "Stopping and removing any existing container named '\${CONTAINER_NAME}'..."
+if sudo docker ps -a --format '{{.Names}}' | grep -q "^\${CONTAINER_NAME}\$"; then
+    sudo docker stop "\${CONTAINER_NAME}" > /dev/null 2>&1 || true
+    sudo docker rm "\${CONTAINER_NAME}" > /dev/null 2>&1 || true
+    log_action "Existing container removed."
+else
+    log_action "No existing container named '\${CONTAINER_NAME}' found."
+fi
+
+
+log_action "Starting new Docker container '\${CONTAINER_NAME}'..."
+sudo docker run -d \\
+    --name "\${CONTAINER_NAME}" \\
+    --restart=always \\
+    --network=host \\
+    -e DEVICE_SERIAL \\
+    -e DEVICE_ID \\
+    -e PROVISIONING_INSTANCE_UUID \\
+    -e FIREBASE_UID \\
+    -e FIREBASE_CUSTOM_TOKEN \\
+    -e FIREBASE_API_KEY \\
+    -e FIREBASE_PROJECT_ID \\
+    -e FIREBASE_AUTH_DOMAIN \\
+    -e DOCKER_IMAGE \\
+    "\${DOCKER_IMAGE}"
+
+log_action "Docker container '\${CONTAINER_NAME}' started."
+log_action "--- ✅ Provisioning script execution completed. ---"
+exit 0
+`;
+
       const script = scriptTemplate
         .replace(/__SERIAL__/g, serial)
         .replace(/__DEVICE_ID__/g, deviceId)
         .replace(/__PROVISIONING_INSTANCE_UUID__/g, provisioningInstanceUuid)
-        .replace(/__FIREBASE_UID__/g, deviceId)
+        .replace(/__FIREBASE_UID__/g, deviceId) // Firebase UID is the deviceId
         .replace(/__FIREBASE_CUSTOM_TOKEN__/g, firebaseToken)
         .replace(
           /__FIREB_API_KEY__/g,
           FIREB_API_KEY || "MISSING_API_KEY_IN_ENV"
         )
         .replace(
-          /__PROJECT_ID__/g,
+          /__FIREBASE_PROJECT_ID__/g,
           FIREBASE_PROJECT_ID || "MISSING_PROJECT_ID_IN_ENV"
         )
         .replace(
@@ -426,7 +445,7 @@ exports.getProvisionScript = functions.onRequest(
           FIREBASE_AUTH_DOMAIN || "MISSING_AUTH_DOMAIN_IN_ENV"
         )
         .replace(/__DOCKER_IMAGE__/g, DEVICE_DOCKER_IMAGE)
-        .replace(/__TAILSCALE_KEY__/g, tailscaleAuthKey)
+        .replace(/__TAILSCALE_KEY__/g, tailscaleKey)
         .replace(/__CONTAINER_NAME_VAR__/g, containerName);
 
       logger.info({
@@ -435,7 +454,8 @@ exports.getProvisionScript = functions.onRequest(
         deviceId,
         serial,
       });
-      res.setHeader("Content-Type", "text/x-shellscript; charset=utf-8");
+
+      res.setHeader("Content-Type", "text/x-shellscript");
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="provision-${serial}.sh"`
@@ -445,6 +465,8 @@ exports.getProvisionScript = functions.onRequest(
       logger.error({
         message: "Fatal error during script generation process.",
         functionName,
+        requestIp,
+        hashPrefix,
         error: error.message,
         stack: error.stack,
       });

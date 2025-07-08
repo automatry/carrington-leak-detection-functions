@@ -22,7 +22,7 @@ export default function DeviceCard({ device }) {
   const [downloadError, setDownloadError] = useState(null);
   // --- END NEW STATE ---
 
-  // --- Data Preparation --- (same as before)
+  // --- Data Preparation ---
   const apartmentName = APARTMENT || 'Unassigned';
   const displayFriendlyName = friendlyName || '(No Friendly Name)';
   const displaySerial = serial || 'N/A';
@@ -38,7 +38,7 @@ export default function DeviceCard({ device }) {
     return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
   }, [lastUpdate]);
 
-  // --- Status Classes --- (same as before)
+  // --- Status Classes ---
   const provisionedClass = getBooleanStatusClass(registered, 'statusProvisioned', 'statusNotProvisioned');
   const provisionedText = registered ? 'Provisioned' : 'Not Provisioned';
   const commissionedClass = getBooleanStatusClass(commissioned, 'statusCommissioned', 'statusNotCommissioned');
@@ -56,14 +56,14 @@ export default function DeviceCard({ device }) {
 
       // Ensure hash is available
       if (!hash) {
-           console.error("Error: Device hash is missing, cannot generate provision script URL.", device);
+           console.error("Error: Device hash is missing, cannot generate provision script URL.", { device });
            setDownloadError("Device data is incomplete (missing hash).");
            return;
       }
-      // Ensure URL is configured
+      // Ensure URL is configured from environment variables
       const functionBaseUrl = process.env.NEXT_PUBLIC_GET_PROVISION_SCRIPT_URL;
       if (!functionBaseUrl) {
-          console.error("Error: NEXT_PUBLIC_GET_PROVISION_SCRIPT_URL is not defined.");
+          console.error("Error: NEXT_PUBLIC_GET_PROVISION_SCRIPT_URL is not defined in your .env.local file.");
           setDownloadError("Provisioning script URL is not configured.");
           return;
       }

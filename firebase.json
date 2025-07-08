@@ -10,7 +10,9 @@
         "firebase-debug.*.log",
         "*.local",
         ".env",
-        ".next"
+        ".next",
+        "functions/keys/",
+        "/keys"
       ],
       "predeploy": ["npm run predeploy"],
       "defaultRegion": "europe-west1",
