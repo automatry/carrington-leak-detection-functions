@@ -1,51 +1,41 @@
 // functions/src/getProvisionScript.js
-
 const functions = require("firebase-functions/v2/https");
+const { onRequest } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const fetch = require("node-fetch");
 const crypto = require("crypto");
-const { admin, db, rtdb } = require("../firebaseClient");
+const { admin, db } = require("../firebaseClient");
 const { FieldValue } = require("firebase-admin/firestore");
 
 // --- Configuration ---
-const DEVICE_PROVISION_RATE_LIMIT_SECONDS = parseInt(
-  process.env.DEVICE_RATE_LIMIT_S || "60",
-  10
-);
-const IP_RATE_LIMIT_SECONDS = parseInt(process.env.IP_RATE_LIMIT_S || "5", 10);
-const RTDB_IP_LIMIT_PATH =
-  process.env.RTDB_IP_LIMIT_PATH || "provisioningIpRateLimits";
+// Read secrets and environment variables once.
 const TAILSCALE_API_KEY = process.env.TAILSCALE_API_KEY;
+const DEVICE_UPDATE_TOKEN = process.env.DEVICE_UPDATE_TOKEN;
 const TAILNET = process.env.TAILSCALE_TAILNET || "missing-tailnet.ts.net";
-const TAILSCALE_KEY_EXPIRY_SECONDS = parseInt(
-  process.env.TS_KEY_EXPIRY_S || "600",
-  10
-);
 const TAILSCALE_TAG = process.env.TAILSCALE_PROVISION_TAG || "tag:provisioned";
-const DEVICE_DOCKER_IMAGE = process.env.DEVICE_DOCKER_IMAGE; // Now read from .env
-const FIREB_API_KEY = process.env.FIREB_API_KEY;
-const FIREBASE_PROJECT_ID =
-  process.env.GCLOUD_PROJECT || process.env.PROJECT_ID;
-const FIREBASE_AUTH_DOMAIN =
-  process.env.FIREBASE_AUTH_DOMAIN || `${FIREBASE_PROJECT_ID}.firebaseapp.com`;
-const UPDATE_STATUS_URL = process.env.UPDATE_STATUS_URL;
+const DEVICE_DOCKER_IMAGE = process.env.DEVICE_DOCKER_IMAGE;
+const UPDATE_STATUS_URL = process.env.DEVICE_STATUS_UPDATE_URL;
+const WS_SERVER_URL = process.env.WS_SERVER_URL;
+const LOG_BUCKET_NAME = process.env.LOG_BUCKET_NAME;
+
+const FIREBASE_PROJECT_ID = process.env.GCLOUD_PROJECT;
+const TAILSCALE_KEY_EXPIRY_SECONDS = 600;
 
 /**
- * Helper to generate a Tailscale auth key.
+ * Generates a one-time use Tailscale authentication key.
+ * @param {string} serial The device serial number, used for logging.
+ * @returns {Promise<string>} The Tailscale auth key.
  */
 async function generateTailscaleKey(serial) {
   const functionName = "generateTailscaleKey";
   if (!TAILSCALE_API_KEY) {
     logger.error({
-      message:
-        "Tailscale API key (TAILSCALE_API_KEY secret) is not configured.",
+      message: "Tailscale API key (TAILSCALE_API_KEY) is not configured.",
       functionName,
-      suggestion:
-        "Ensure the secret is populated with a valid Tailscale API Key (starts with tskey-api-).",
     });
     throw new Error("Configuration Error: Tailscale API key missing.");
   }
-  if (!TAILNET || TAILNET === "missing-tailnet.ts.net") {
+  if (!TAILNET || TAILNET.includes("missing-tailnet")) {
     logger.error({
       message: "Tailscale Tailnet (TAILSCALE_TAILNET) is not configured.",
       functionName,
@@ -54,7 +44,6 @@ async function generateTailscaleKey(serial) {
   }
 
   const url = `https://api.tailscale.com/api/v2/tailnet/${TAILNET}/keys`;
-
   const body = {
     capabilities: {
       devices: {
@@ -67,13 +56,13 @@ async function generateTailscaleKey(serial) {
       },
     },
     expirySeconds: TAILSCALE_KEY_EXPIRY_SECONDS,
+    description: `Provisioning key for device S/N: ${serial}`,
   };
 
   logger.info({
     message: "Generating Tailscale Auth Key",
     functionName,
     tailnet: TAILNET,
-    requestBody: body,
     serial,
   });
 
@@ -88,10 +77,9 @@ async function generateTailscaleKey(serial) {
     });
 
     const responseText = await response.text();
-
     if (!response.ok) {
       logger.error({
-        message: "Tailscale API error generating auth key.",
+        message: "Tailscale API error",
         functionName,
         serial,
         status: response.status,
@@ -105,7 +93,7 @@ async function generateTailscaleKey(serial) {
     const data = JSON.parse(responseText);
     if (!data.key || !data.key.startsWith("tskey-auth-")) {
       logger.error({
-        message: "Tailscale API response did not contain a valid Auth Key.",
+        message: "Tailscale API response missing valid key.",
         functionName,
         serial,
         responseData: data,
@@ -122,8 +110,7 @@ async function generateTailscaleKey(serial) {
     return data.key;
   } catch (error) {
     logger.error({
-      message:
-        "Failed to generate Tailscale auth key due to an API interaction error.",
+      message: "Failed to generate Tailscale auth key.",
       functionName,
       serial,
       error: error.message,
@@ -134,70 +121,174 @@ async function generateTailscaleKey(serial) {
 }
 
 /**
- * Sanitizes IP address for use as RTDB key.
+ * Generates the main provisioning script for the device.
+ * @param {object} params Parameters for script generation.
+ * @returns {string} The generated shell script.
  */
-function sanitizeIpForKey(ip) {
-  if (!ip) {
-    logger.warn("sanitizeIpForKey called with null or undefined IP.");
-    return "unknown-ip";
-  }
-  return String(ip)
-    .replace(/[.#$[\]/]/g, "-")
-    .replace(/:/g, "-");
+function generateScript(params) {
+  const {
+    deviceId,
+    serial,
+    apartment,
+    apartmentId,
+    project,
+    tailscaleAuthKey,
+    containerName,
+  } = params;
+
+  const scriptLines = [
+    "#!/bin/bash",
+    "# Auto-generated provisioning script",
+    "set -euo pipefail",
+    "",
+    "## --- Logging and Helper Functions ---",
+    "log_action() { echo \"[PROV-SCRIPT] [$(date -u +'%Y-%m-%dT%H:%M:%SZ')] $1\"; }",
+    "",
+    "report_status() {",
+    '    local status_message="$1"',
+    "    local payload",
+    '    payload=$(printf \'{"deviceId": "%s", "provisioningStatus": "%s"}\' "${DEVICE_ID}" "$status_message")',
+    '    log_action "Reporting status to cloud: ${status_message}"',
+    '    curl --fail-with-body -sS -X POST -H "Content-Type: application/json" -H "Authorization: Bearer ${DEVICE_UPDATE_TOKEN}" -d "${payload}" "${UPDATE_STATUS_URL}" || log_action "WARNING: Failed to report status \'${status_message}\' to the cloud."',
+    "}",
+    "",
+    "install_if_missing() {",
+    '    local cmd_to_check="$1" pkg_to_install="$2"',
+    '    if ! command -v "${cmd_to_check}" &> /dev/null; then',
+    "        log_action \"Dependency '${cmd_to_check}' not found. Installing package '${pkg_to_install}'...\"",
+    '        sudo apt-get update -y && sudo apt-get install -y "${pkg_to_install}"',
+    "    else",
+    "        log_action \"Dependency '${cmd_to_check}' already present.\"",
+    "    fi",
+    "}",
+    "",
+    "## --- Main Execution ---",
+    'log_action "--- 🚀 Starting Full Provisioning Process ---"',
+    "",
+    "## --- Exporting Configuration to Environment ---",
+    'log_action "Exporting configuration as environment variables..."',
+    'export DEVICE_ID="__DEVICE_ID__"',
+    'export APARTMENT="__APARTMENT__"',
+    'export APARTMENT_ID="__APARTMENT_ID__"',
+    'export PROJECT="__PROJECT__"',
+    'export WS_SERVER_URL="__WS_SERVER_URL__"',
+    'export LOG_BUCKET_NAME="__LOG_BUCKET_NAME__"',
+    'export DEVICE_UPDATE_TOKEN="__DEVICE_UPDATE_TOKEN__"',
+    'export DEVICE_STATUS_UPDATE_URL="__UPDATE_STATUS_URL__"',
+    'export GOOGLE_APPLICATION_CREDENTIALS="serviceAccount.json" # This will be created inside the container',
+    "",
+    'report_status "installing_dependencies"',
+    "",
+    "## --- Dependency Installation ---",
+    'log_action "Installing system dependencies..."',
+    "install_if_missing curl curl",
+    "install_if_missing docker docker.io",
+    "",
+    "## --- Tailscale Installation and Setup ---",
+    "if ! command -v tailscale &> /dev/null; then",
+    '    log_action "Installing Tailscale..."',
+    "    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null",
+    "    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list | sudo tee /etc/apt/sources.list.d/tailscale.list >/dev/null",
+    "    sudo apt-get update",
+    "    sudo apt-get install -y tailscale",
+    "else",
+    '    log_action "Tailscale is already installed."',
+    "fi",
+    'log_action "Starting Tailscale and connecting to tailnet..."',
+    'sudo tailscale up --authkey="__TAILSCALE_KEY__" --hostname="__SERIAL__" --accept-routes',
+    "",
+    'report_status "deploying_application_container"',
+    "",
+    "## --- Application Container Deployment ---",
+    'log_action "Pulling required Docker image: __DOCKER_IMAGE__"',
+    'sudo docker pull "__DOCKER_IMAGE__"',
+    "",
+    'CONTAINER_NAME="__CONTAINER_NAME__"',
+    "log_action \"Ensuring no old container named '${CONTAINER_NAME}' exists...\"",
+    "if sudo docker ps -a --format '{{.Names}}' | grep -Eq \"^${CONTAINER_NAME}$\"; then",
+    '    log_action "Stopping and removing existing container: ${CONTAINER_NAME}"',
+    '    sudo docker stop "${CONTAINER_NAME}" >/dev/null 2>&1 || true',
+    '    sudo docker rm "${CONTAINER_NAME}" >/dev/null 2>&1 || true',
+    "fi",
+    "",
+    'log_action "Starting new application container: ${CONTAINER_NAME}"',
+    "sudo docker run -d \\",
+    '    --name "${CONTAINER_NAME}" \\',
+    "    --restart=always \\",
+    "    --network=host \\",
+    "    -e DEVICE_ID \\",
+    "    -e APARTMENT \\",
+    "    -e APARTMENT_ID \\",
+    "    -e PROJECT \\",
+    "    -e WS_SERVER_URL \\",
+    "    -e LOG_BUCKET_NAME \\",
+    "    -e DEVICE_UPDATE_TOKEN \\",
+    "    -e DEVICE_STATUS_UPDATE_URL \\",
+    "    -e GOOGLE_APPLICATION_CREDENTIALS \\",
+    '    "__DOCKER_IMAGE__"',
+    "",
+    "sleep 5", // Give container a moment to start
+    "if ! sudo docker ps --format '{{.Names}}' | grep -Eq \"^${CONTAINER_NAME}$\"; then",
+    '    log_action "ERROR: Container ${CONTAINER_NAME} failed to start. Please check Docker logs on the device."',
+    '    report_status "container_start_failed"',
+    "    exit 1",
+    "fi",
+    "",
+    "## --- Final Status Update ---",
+    'report_status "provisioning_complete"',
+    'log_action "--- ✅ Provisioning script execution completed successfully. ---"',
+    "exit 0",
+  ];
+
+  // Replace all placeholder values
+  return scriptLines
+    .join("\n")
+    .replace(/__DEVICE_ID__/g, deviceId)
+    .replace(/__SERIAL__/g, serial)
+    .replace(/__APARTMENT__/g, apartment)
+    .replace(/__APARTMENT_ID__/g, apartmentId)
+    .replace(/__PROJECT__/g, project)
+    .replace(/__TAILSCALE_KEY__/g, tailscaleAuthKey)
+    .replace(/__DOCKER_IMAGE__/g, DEVICE_DOCKER_IMAGE)
+    .replace(/__CONTAINER_NAME__/g, containerName)
+    .replace(/__WS_SERVER_URL__/g, WS_SERVER_URL || "")
+    .replace(/__LOG_BUCKET_NAME__/g, LOG_BUCKET_NAME || "")
+    .replace(/__DEVICE_UPDATE_TOKEN__/g, DEVICE_UPDATE_TOKEN || "")
+    .replace(/__UPDATE_STATUS_URL__/g, UPDATE_STATUS_URL);
 }
 
-exports.getProvisionScript = functions.onRequest(
-  { region: "europe-west1", secrets: ["TAILSCALE_API_KEY", "FIREB_API_KEY"] },
+exports.getProvisionScript = onRequest(
+  {
+    region: "europe-west1",
+    secrets: ["TAILSCALE_API_KEY", "DEVICE_UPDATE_TOKEN"],
+  },
   async (req, res) => {
     const functionName = "getProvisionScript";
     const startTimestamp = Date.now();
-    logger.info({ message: "Function execution started.", functionName, method: req.method, ip: req.ip });
+    logger.info({
+      message: "Function execution started.",
+      functionName,
+      ip: req.ip,
+    });
 
     if (req.method !== "GET") {
+      logger.warn({
+        message: "Method not allowed.",
+        functionName,
+        method: req.method,
+      });
       res.setHeader("Allow", "GET");
       return res.status(405).send("Method Not Allowed");
     }
 
-    if (!UPDATE_STATUS_URL || !DEVICE_DOCKER_IMAGE) {
-        logger.error("FATAL: Server configuration is incomplete. Required environment variables are missing.", {
-            hasUpdateUrl: !!UPDATE_STATUS_URL,
-            hasDockerImage: !!DEVICE_DOCKER_IMAGE
-        });
-        return res.status(500).send("Internal Server Error: Server configuration is incomplete.");
-    }
-
-    const requestIp = req.ip;
-    if (requestIp) {
-      const ipRateLimitRef = rtdb.ref(
-        `${RTDB_IP_LIMIT_PATH}/${sanitizeIpForKey(requestIp)}`
+    if (!DEVICE_DOCKER_IMAGE || !UPDATE_STATUS_URL) {
+      logger.error(
+        "FATAL: Server configuration incomplete. DEVICE_DOCKER_IMAGE or DEVICE_STATUS_UPDATE_URL is missing from environment.",
+        { functionName }
       );
-      try {
-        const ipSnapshot = await ipRateLimitRef.once("value");
-        if (
-          ipSnapshot.val() &&
-          (Date.now() - ipSnapshot.val()) / 1000 < IP_RATE_LIMIT_SECONDS
-        ) {
-          logger.warn({
-            message: "IP Rate Limit hit.",
-            functionName,
-            requestIp,
-          });
-          return res
-            .status(429)
-            .send("Too many requests from this IP address.");
-        }
-        await ipRateLimitRef.set(Date.now());
-      } catch (error) {
-        logger.error({
-          message: "Error during IP rate limit check.",
-          functionName,
-          requestIp,
-          error: error.message,
-        });
-        return res
-          .status(500)
-          .send("Internal server error during rate limit check.");
-      }
+      return res
+        .status(500)
+        .send("Internal Server Error: Server configuration is incomplete.");
     }
 
     const deviceHash = req.query.device_hash;
@@ -205,10 +296,9 @@ exports.getProvisionScript = functions.onRequest(
       logger.warn({
         message: "Invalid or missing 'device_hash' parameter.",
         functionName,
-        requestIp,
         providedHash: deviceHash,
       });
-      return res.status(400).send("Invalid 'device_hash' format.");
+      return res.status(400).send("Bad Request: Invalid 'device_hash' format.");
     }
 
     try {
@@ -222,7 +312,6 @@ exports.getProvisionScript = functions.onRequest(
         logger.warn({
           message: "Device hash not found.",
           functionName,
-          requestIp,
           hashPrefix: deviceHash.substring(0, 8),
         });
         return res.status(403).send("Unauthorized device: Hash not found.");
@@ -231,8 +320,12 @@ exports.getProvisionScript = functions.onRequest(
       const doc = snapshot.docs[0];
       const deviceId = doc.id;
       const deviceData = doc.data();
-      const { serial, approvedForProvisioning, lastProvisionRequest } =
-        deviceData;
+      const {
+        serial,
+        approvedForProvisioning,
+        identity,
+        lastProvisionRequest,
+      } = deviceData;
 
       if (approvedForProvisioning !== true) {
         logger.warn({
@@ -249,21 +342,9 @@ exports.getProvisionScript = functions.onRequest(
           .send("Unauthorized: Device provisioning has not been approved.");
       }
 
-      if (!serial) {
-        logger.error({
-          message: "Device document missing 'serial' field.",
-          functionName,
-          deviceId,
-        });
-        return res
-          .status(500)
-          .send("Internal configuration error: Device serial missing.");
-      }
-
       if (
         lastProvisionRequest &&
-        (new Date() - lastProvisionRequest.toDate()) / 1000 <
-          DEVICE_PROVISION_RATE_LIMIT_SECONDS
+        (new Date() - lastProvisionRequest.toDate()) / 1000 < 60
       ) {
         logger.warn({
           message: "Device Rate Limit hit.",
@@ -273,173 +354,27 @@ exports.getProvisionScript = functions.onRequest(
         });
         return res
           .status(429)
-          .send(
-            "Provisioning for this device was requested recently. Please wait."
-          );
+          .send("Provisioning was requested recently. Please wait.");
       }
 
-      const provisioningInstanceUuid = crypto.randomUUID();
+      const tailscaleAuthKey = await generateTailscaleKey(serial);
+
       await doc.ref.update({
-        provisioningStatus: "script_generated",
+        provisioningStatus: "generating_script",
         lastProvisionRequest: FieldValue.serverTimestamp(),
-        uuid: provisioningInstanceUuid,
-        lastProvisionIP: requestIp || "emulator",
+        lastProvisionIP: req.ip,
       });
 
-      const firebaseToken = await admin
-        .auth()
-        .createCustomToken(deviceId, {
-          serial,
-          provisioningInstanceUuid,
-          deviceId,
-        });
-      const tailscaleAuthKey = await generateTailscaleKey(serial);
-      const containerName = "bacnet-service";
-
-      const scriptLines = [
-        "#!/bin/bash",
-        "set -euo pipefail",
-        "log_action() { echo \"[PROV-SCRIPT] [$(date -u +'%Y-%m-%dT%H:%M:%SZ')] $1\"; }",
-        'log_action "--- 🚀 Starting Full Provisioning Process ---"',
-        "export DEBIAN_FRONTEND=noninteractive",
-        'export DEVICE_SERIAL="__SERIAL__"',
-        'export DEVICE_ID="__DEVICE_ID__"',
-        'export PROVISIONING_INSTANCE_UUID="__PROVISIONING_INSTANCE_UUID__"',
-        'export FIREBASE_UID="__FIREBASE_UID__"',
-        'export FIREBASE_CUSTOM_TOKEN="__FIREBASE_CUSTOM_TOKEN__"',
-        'export FIREBASE_API_KEY="__FIREB_API_KEY__"',
-        'export FIREBASE_PROJECT_ID="__FIREBASE_PROJECT_ID__"',
-        'export FIREBASE_AUTH_DOMAIN="__FIREBASE_AUTH_DOMAIN__"',
-        'export DOCKER_IMAGE="__DOCKER_IMAGE__"',
-        'export UPDATE_STATUS_URL="__UPDATE_STATUS_URL__"',
-        "",
-        "## --- Helper Functions ---",
-        "start_service() {",
-        "    local service_name=$1",
-        "    if [ -d /run/systemd/system ]; then",
-        "        log_action \"Systemd detected. Starting/enabling service '${service_name}' with systemctl.\"",
-        '        sudo systemctl enable --now "${service_name}"',
-        "    else",
-        "        log_action \"No systemd detected. Starting service '${service_name}' directly.\"",
-        '        case "${service_name}" in',
-        "            sshd)",
-        "                sudo mkdir -p /run/sshd",
-        "                sudo /usr/sbin/sshd",
-        "                ;;",
-        "            docker)",
-        "                sudo dockerd > /dev/null 2>&1 &",
-        "                ;;",
-        "            tailscaled)",
-        "                sudo tailscaled > /dev/null 2>&1 &",
-        "                ;;",
-        "            nxserver.service)",
-        "                sudo /usr/NX/bin/nxserver --startup",
-        "                ;;",
-        "            *)",
-        "                log_action \"WARNING: Unknown service '${service_name}' for non-systemd environment.\"",
-        "                ;;",
-        "        esac",
-        "    fi",
-        "}",
-        "install_if_missing() {",
-        '    local pkg_name="$1"',
-        '    if ! dpkg -l | grep -q "^ii.*$pkg_name"; then',
-        "        log_action \"Package '$pkg_name' not found. Installing...\"",
-        '        sudo apt-get update -y && sudo apt-get install -y "$pkg_name"',
-        "    else",
-        "        log_action \"Package '$pkg_name' is already installed.\"",
-        "    fi",
-        "}",
-        "install_tailscale() {",
-        "    if ! command -v tailscale &> /dev/null; then",
-        '        log_action "Tailscale not found. Performing full installation..."',
-        "        install_if_missing curl curl",
-        "        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg > /dev/null",
-        "        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list | sudo tee /etc/apt/sources.list.d/tailscale.list",
-        "        sudo apt-get update",
-        "        sudo apt-get install -y tailscale",
-        "    else",
-        '        log_action "Tailscale is already installed."',
-        "    fi",
-        "}",
-        "",
-        "## --- Dependency Installation ---",
-        "install_if_missing curl",
-        "install_if_missing wget",
-        "install_if_missing file",
-        "install_if_missing docker.io",
-        "install_tailscale",
-        "",
-        "## --- Service Startup: SSH ---",
-        "install_if_missing openssh-server",
-        "start_service sshd",
-        "",
-        "## --- Service Startup: NoMachine ---",
-        "ARCH=$(uname -m)",
-        'log_action "Detected Architecture: ${ARCH}"',
-        'if [[ "${ARCH}" == "x86_64" ]]; then NOMACHINE_URL="https://download.nomachine.com/download/9.0/Linux/nomachine_9.0.188_11_amd64.deb"; elif [[ "${ARCH}" == "aarch64" ]]; then NOMACHINE_URL="https://download.nomachine.com/download/9.0/Linux/nomachine_9.0.188_11_arm64.deb"; else NOMACHINE_URL=""; fi',
-        'if [[ -n "${NOMACHINE_URL}" ]]; then',
-        '  log_action "Installing NoMachine from ${NOMACHINE_URL}"',
-        "  NOMACHINE_PKG_FILE=$(mktemp /tmp/nomachine.XXXXXX.deb)",
-        '  wget --output-document="${NOMACHINE_PKG_FILE}" "${NOMACHINE_URL}"',
-        '  log_action "Validating downloaded package..."',
-        "  if file \"${NOMACHINE_PKG_FILE}\" | grep -q 'Debian binary package'; then",
-        '    log_action "Package is a valid Debian archive. Proceeding with installation."',
-        '    sudo dpkg -i "${NOMACHINE_PKG_FILE}"',
-        "    sudo apt-get install -f -y",
-        "    start_service nxserver.service",
-        "  else",
-        '    log_action "ERROR: Downloaded file is not a valid Debian package. Skipping NoMachine installation."',
-        "  fi",
-        '  rm -f "${NOMACHINE_PKG_FILE}"',
-        "fi",
-        "",
-        "## --- Service Startup: Docker & Tailscale ---",
-        "start_service docker",
-        "start_service tailscaled",
-        "sleep 5",
-        'log_action "Configuring Tailscale and connecting to tailnet..."',
-        'sudo tailscale up --authkey="__TAILSCALE_KEY__" --hostname="__SERIAL__" --accept-routes',
-        "",
-        "## --- Application Container Deployment ---",
-        'log_action "Pulling required Docker image: ${DOCKER_IMAGE}..."',
-        'sudo docker pull "${DOCKER_IMAGE}"',
-        'CONTAINER_NAME="__CONTAINER_NAME_VAR__"',
-        'if sudo docker ps -a --format \'{{.Names}}\' | grep -q "^${CONTAINER_NAME}$"; then sudo docker stop "${CONTAINER_NAME}" > /dev/null 2>&1 && sudo docker rm "${CONTAINER_NAME}" > /dev/null 2>&1; fi',
-        'sudo docker run -d --name "${CONTAINER_NAME}" --restart=always --network=host -e DEVICE_SERIAL -e DEVICE_ID -e PROVISIONING_INSTANCE_UUID -e FIREBASE_UID -e FIREBASE_CUSTOM_TOKEN -e FIREBASE_API_KEY -e FIREBASE_PROJECT_ID -e FIREBASE_AUTH_DOMAIN -e DOCKER_IMAGE "${DOCKER_IMAGE}"',
-        "",
-        "## --- Final Status Update ---",
-        'log_action "Reporting provisioning completion to the cloud..."',
-        "UPDATE_PAYLOAD=$(printf '{\"deviceId\": \"%s\", \"registered\": true, \"provisioningStatus\": \"provisioning_complete\"}' \"$DEVICE_ID\")",
-        "curl --fail -X POST -H \"Content-Type: application/json\" -d \"$UPDATE_PAYLOAD\" \"$UPDATE_STATUS_URL\"",
-        "",
-        'log_action "--- ✅ Provisioning script execution completed. ---"',
-        "exit 0",
-      ];
-
-      const scriptTemplate = scriptLines.join("\n");
-      const script = scriptTemplate
-        .replace(/__SERIAL__/g, serial)
-        .replace(/__DEVICE_ID__/g, deviceId)
-        .replace(/__PROVISIONING_INSTANCE_UUID__/g, provisioningInstanceUuid)
-        .replace(/__FIREBASE_UID__/g, deviceId)
-        .replace(/__FIREBASE_CUSTOM_TOKEN__/g, firebaseToken)
-        .replace(
-          /__FIREB_API_KEY__/g,
-          FIREB_API_KEY || "MISSING_API_KEY_IN_ENV"
-        )
-        .replace(
-          /__PROJECT_ID__/g,
-          FIREBASE_PROJECT_ID || "MISSING_PROJECT_ID_IN_ENV"
-        )
-        .replace(
-          /__FIREBASE_AUTH_DOMAIN__/g,
-          FIREBASE_AUTH_DOMAIN || "MISSING_AUTH_DOMAIN_IN_ENV"
-        )
-        .replace(/__DOCKER_IMAGE__/g, DEVICE_DOCKER_IMAGE)
-        .replace(/__TAILSCALE_KEY__/g, tailscaleAuthKey)
-        .replace(/__CONTAINER_NAME_VAR__/g, containerName)
-        .replace(/__UPDATE_STATUS_URL__/g, UPDATE_STATUS_URL);
+      const script = generateScript({
+        deviceId,
+        serial: serial || `unassigned-sn-${deviceId.substring(0, 4)}`,
+        apartment: identity?.APARTMENT || "Unassigned Apartment",
+        apartmentId:
+          identity?.APARTMENT_ID || `unassigned-id-${deviceId.substring(0, 4)}`,
+        project: identity?.PROJECT || "Unassigned Project",
+        tailscaleAuthKey,
+        containerName: "bacnet-reader-service",
+      });
 
       logger.info({
         message: "Provisioning script generated successfully.",
@@ -450,12 +385,12 @@ exports.getProvisionScript = functions.onRequest(
       res.setHeader("Content-Type", "text/x-shellscript; charset=utf-8");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="provision-${serial}.sh"`
+        `attachment; filename="provision-${serial || deviceId}.sh"`
       );
       res.status(200).send(script);
     } catch (error) {
       logger.error({
-        message: "Fatal error during script generation process.",
+        message: "Fatal error during script generation.",
         functionName,
         error: error.message,
         stack: error.stack,
@@ -464,11 +399,10 @@ exports.getProvisionScript = functions.onRequest(
         .status(500)
         .send("Internal Server Error. Failed to generate provisioning script.");
     } finally {
-      const executionTime = Date.now() - startTimestamp;
       logger.info({
         message: "Function execution finished.",
         functionName,
-        executionTimeMs: executionTime,
+        executionTimeMs: Date.now() - startTimestamp,
       });
     }
   }

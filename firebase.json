@@ -11,9 +11,6 @@
         "*.local",
         ".env"
       ],
-      "predeploy": [
-        "npm run build-and-copy"
-      ],
       "defaultRegion": "europe-west1",
       "serviceAccount": "firebase-adminsdk-fbsvc@carrington-leak-detection.iam.gserviceaccount.com"
     }

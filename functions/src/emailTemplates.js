@@ -7,7 +7,26 @@
  */
 function renderNotificationHTML(notification) {
   const type = (notification.type || "generic").toLowerCase();
-  const triggeredAt = notification.triggeredAt || new Date().toISOString();
+  
+  // Handle Firestore Timestamp or other date formats
+  let triggeredAt;
+  try {
+    if (notification.triggeredAt?.toDate) {
+      // Firestore Timestamp object
+      triggeredAt = notification.triggeredAt.toDate().toLocaleString();
+    } else if (notification.triggeredAt instanceof Date) {
+      // JavaScript Date object
+      triggeredAt = notification.triggeredAt.toLocaleString();
+    } else if (typeof notification.triggeredAt === "string") {
+      // ISO string
+      triggeredAt = new Date(notification.triggeredAt).toLocaleString();
+    } else {
+      triggeredAt = new Date().toLocaleString(); // fallback
+    }
+  } catch (err) {
+    triggeredAt = "Unknown";
+  }
+
   const apartment = notification.apartment || "Unknown";
   const status = notification.status || "N/A";
   const faultList = notification.faults || [];
@@ -17,31 +36,30 @@ function renderNotificationHTML(notification) {
   let message = "A system event has been triggered.";
 
   switch (type) {
-  case "leak-detected":
-    title = `🚨 Leak Detected in Apartment ${apartment}`;
-    message = `A leak has been detected with status: 
-      <strong>${status}</strong>.`;
-    break;
-  case "leak-cleared":
-    title = `✅ Leak Cleared in Apartment ${apartment}`;
-    message = `The leak previously reported has now been cleared.`;
-    break;
-  case "offline":
-    title = `🔌 Apartment ${apartment} Went Offline`;
-    message = `The apartment device is currently not responding.`;
-    break;
-  case "online":
-    title = `🔄 Apartment ${apartment} Back Online`;
-    message = `The apartment device has come back online and is now reachable.`;
-    break;
-  case "scheduled-report":
-    title = `📋 Daily Fault Report`;
-    message = `Below is a list of apartments with unresolved faults:`;
-    break;
-  default:
-    title = notification.subject || "General Notification";
-    message = notification.message || "Please review the system alert.";
-    break;
+    case "leak-detected":
+      title = `🚨 Leak Detected in Apartment ${apartment}`;
+      message = `A leak has been detected! Please investigate immediately.`;
+      break;
+    case "leak-cleared":
+      title = `✅ Leak Cleared in Apartment ${apartment}`;
+      message = `The leak previously reported has now been cleared.`;
+      break;
+    case "offline":
+      title = `🔌 Apartment ${apartment} Went Offline`;
+      message = `The apartment device is currently not responding.`;
+      break;
+    case "online":
+      title = `🔄 Apartment ${apartment} Back Online`;
+      message = `The apartment device has come back online and is now reachable.`;
+      break;
+    case "scheduled-report":
+      title = `📋 Daily Fault Report`;
+      message = `Below is a list of apartments with unresolved faults:`;
+      break;
+    default:
+      title = notification.subject || "General Notification";
+      message = notification.message || "Please review the system alert.";
+      break;
   }
 
   return `
@@ -89,9 +107,10 @@ function renderNotificationHTML(notification) {
           <p>${message}</p>
           <p><strong>Time Triggered:</strong> ${triggeredAt}</p>
           ${
-  type === "scheduled-report" && faultList.length > 0 ?
-    `<ul>${faultsHTML}</ul>` : ""
-}
+            type === "scheduled-report" && faultList.length > 0
+              ? `<ul>${faultsHTML}</ul>`
+              : ""
+          }
           <div class="footer">
             This email was generated automatically 
             by the Automatry system.<br />

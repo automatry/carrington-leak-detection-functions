@@ -1,6 +1,6 @@
 // functions/notifyFromNotification.js
-const { onDocumentCreated } =
-  require("firebase-functions/v2/firestore");
+
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const sgMail = require("@sendgrid/mail");
 const logger = require("firebase-functions/logger");
@@ -33,9 +33,9 @@ exports.notifyStatusChange = onDocumentCreated(
       }
 
       const isLocal = process.env.NODE_ENV === "development";
-      const apiKey = isLocal ? process.env.SENDGRID_API_KEY :
-        sendgridApiKey.value();
-
+      const apiKey = isLocal
+        ? process.env.SENDGRID_API_KEY
+        : sendgridApiKey.value();
       sgMail.setApiKey(apiKey);
 
       const recipientsSnap = await db.doc(RECIPIENTS_DOC).get();
@@ -44,74 +44,74 @@ exports.notifyStatusChange = onDocumentCreated(
       }
 
       const recipients = recipientsSnap.data();
-      const emailList = Array.isArray(recipients.emails) ?
-        recipients.emails : [];
+      const emailList = Array.isArray(recipients.emails)
+        ? recipients.emails
+        : [];
 
       const to = emailList
-        .filter((r) => {
-          return !r.copy_type || r.copy_type.toLowerCase() === "none";
-        })
-        .map((r) => {
-          return r.email_address;
-        });
+        .filter((r) => !r.copy_type || r.copy_type.toLowerCase() === "none")
+        .map((r) => r.email_address)
+        .filter(Boolean);
 
       const cc = emailList
-        .filter((r) => {
-          return r.copy_type && r.copy_type.toLowerCase() === "cc";
-        })
-        .map((r) => {
-          return r.email_address;
-        });
+        .filter((r) => r.copy_type && r.copy_type.toLowerCase() === "cc")
+        .map((r) => r.email_address)
+        .filter(Boolean);
 
       const bcc = emailList
-        .filter((r) => {
-          return r.copy_type && r.copy_type.toLowerCase() === "bcc";
-        })
-        .map((r) => {
-          return r.email_address;
-        });
+        .filter((r) => r.copy_type && r.copy_type.toLowerCase() === "bcc")
+        .map((r) => r.email_address)
+        .filter(Boolean);
 
-      // fallback to configured fallback TO address, not BCCs
       if (to.length === 0) {
-        const fallbackEmail = recipients.fallback_to ||
-          "support@automatry.com";
+        const fallbackEmail = recipients.fallback_to || "support@automatry.com";
         to.push(fallbackEmail);
       }
 
       const fromDoc = await db.doc(FROM_EMAIL_DOC).get();
       const emailConfig = fromDoc.exists ? fromDoc.data() : {};
 
-      const from = emailConfig.from ?
-        emailConfig.from : "leak-detection@automatry.com";
-      const replyTo = emailConfig.reply_to ?
-        emailConfig.reply_to : "no-reply@automatry.com";
+      // Default to original email
+      const fromEmail = emailConfig.from || "leak-detection@automatry.com";
+      const fromName = emailConfig.name || "Leak Detection";
+      const replyToEmail = emailConfig.reply_to || "no-reply@automatry.com";
 
-      const subject = notification.subject ?
-        notification.subject : "Leak or Status Alert";
-      const plainText = notification.message ?
-        notification.message : "Alert triggered.";
+      const from = {
+        email: fromEmail,
+        name: fromName,
+      };
+
+      const replyTo = {
+        email: replyToEmail,
+        name: fromName,
+      };
+
+      const subject = notification.subject || "🚨 Leak or Device Alert";
+      const plainText =
+        notification.message ||
+        "An alert has been triggered. Please check the system.";
       const html = renderNotificationHTML(notification);
 
-      // Deduplicate recipients across to, cc, and bcc
-      const allEmails = new Set([...to, ...cc, ...bcc]);
-      const cleanTo = to.filter((email) => email && allEmails.has(email));
-      const cleanCc = cc.filter((email) => email && !cleanTo.includes(email));
-      const cleanBcc = bcc.filter((email) => {
-        return email && !cleanTo.includes(email) && !cleanCc.includes(email);
-      });
+      // Deduplicate addresses
+      const seen = new Set();
+      const cleanTo = to.filter((email) => !seen.has(email) && seen.add(email));
+      const cleanCc = cc.filter((email) => !seen.has(email) && seen.add(email));
+      const cleanBcc = bcc.filter(
+        (email) => !seen.has(email) && seen.add(email)
+      );
 
       const msg = {
         to: cleanTo,
-        cc: cleanCc,
-        bcc: cleanBcc,
-        from: from,
-        replyTo: replyTo,
-        subject: subject,
+        cc: cleanCc.length ? cleanCc : undefined,
+        bcc: cleanBcc.length ? cleanBcc : undefined,
+        from,
+        replyTo,
+        subject,
         text: plainText,
-        html: html,
+        html,
       };
 
-      logger.info("Final email payload:", JSON.stringify(msg, null, 2));
+      logger.info("Sending email with payload:", JSON.stringify(msg, null, 2));
       await sgMail.send(msg);
 
       updateData.status = "sent";
@@ -122,5 +122,5 @@ exports.notifyStatusChange = onDocumentCreated(
     }
 
     await notificationRef.update(updateData);
-  },
+  }
 );
