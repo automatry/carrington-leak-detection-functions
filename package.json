@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "npm run build-and-copy && firebase emulators:start --only functions,hosting",
-    "build-and-copy": "npm run build --workspace=client && npm run copy --workspace=functions",
+    "dev": "firebase emulators:start --only functions",
+    "build-and-copy": "npm run build --workspace=client",
     "deploy:functions": "npm run build-and-copy && firebase deploy --only functions",
-    "deploy:hosting": "npm run build-and-copy && firebase deploy --only hosting",
+    "deploy:app": "npm run build-and-copy && firebase deploy --only apphosting",
     "deploy:all": "npm run build-and-copy && firebase deploy"
   },
   "workspaces": [
