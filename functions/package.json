@@ -8,9 +8,8 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "build-client": "cd ../client && npm install && npm run build",
-    "copy-client": "if exist ..\\client\\.next xcopy /E /I /Y ..\\client\\.next .next && if exist ..\\client\\public xcopy /E /I /Y ..\\client\\public public",
-    "predeploy": "npm run build-client && npm run copy-client && npm run lint"
+    "copy": "npm run clean && copyfiles -u 2 ../client/.next/**/* ./.next && copyfiles -u 2 ../client/public/**/* ./public",
+    "clean": "rimraf .next public"
   },
   "engines": {
     "node": "20"
@@ -23,13 +22,15 @@
     "dotenv": "^16.4.7",
     "firebase-admin": "^12.7.0",
     "firebase-functions": "^6.3.2",
-    "next": "^15.3.5",
+    "next": "15.2.4",
     "nodemailer": "^6.10.0"
   },
   "devDependencies": {
+    "copyfiles": "^2.4.1",
     "eslint": "^8.15.0",
     "eslint-config-google": "^0.14.0",
-    "firebase-functions-test": "^3.1.0"
+    "firebase-functions-test": "^3.1.0",
+    "rimraf": "^5.0.7"
   },
   "private": true
 }
