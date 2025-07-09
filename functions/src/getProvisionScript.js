@@ -22,12 +22,13 @@ const TAILSCALE_KEY_EXPIRY_SECONDS = parseInt(
   10
 );
 const TAILSCALE_TAG = process.env.TAILSCALE_PROVISION_TAG || "tag:provisioned";
-const DEVICE_DOCKER_IMAGE = process.env.DEVICE_DOCKER_IMAGE || "alpine:latest";
+const DEVICE_DOCKER_IMAGE = process.env.DEVICE_DOCKER_IMAGE; // Now read from .env
 const FIREB_API_KEY = process.env.FIREB_API_KEY;
 const FIREBASE_PROJECT_ID =
   process.env.GCLOUD_PROJECT || process.env.PROJECT_ID;
 const FIREBASE_AUTH_DOMAIN =
   process.env.FIREBASE_AUTH_DOMAIN || `${FIREBASE_PROJECT_ID}.firebaseapp.com`;
+const UPDATE_STATUS_URL = process.env.UPDATE_STATUS_URL;
 
 /**
  * Helper to generate a Tailscale auth key.
@@ -150,16 +151,19 @@ exports.getProvisionScript = functions.onRequest(
   async (req, res) => {
     const functionName = "getProvisionScript";
     const startTimestamp = Date.now();
-    logger.info({
-      message: "Function execution started.",
-      functionName,
-      method: req.method,
-      ip: req.ip,
-    });
+    logger.info({ message: "Function execution started.", functionName, method: req.method, ip: req.ip });
 
     if (req.method !== "GET") {
       res.setHeader("Allow", "GET");
       return res.status(405).send("Method Not Allowed");
+    }
+
+    if (!UPDATE_STATUS_URL || !DEVICE_DOCKER_IMAGE) {
+        logger.error("FATAL: Server configuration is incomplete. Required environment variables are missing.", {
+            hasUpdateUrl: !!UPDATE_STATUS_URL,
+            hasDockerImage: !!DEVICE_DOCKER_IMAGE
+        });
+        return res.status(500).send("Internal Server Error: Server configuration is incomplete.");
     }
 
     const requestIp = req.ip;
@@ -307,6 +311,7 @@ exports.getProvisionScript = functions.onRequest(
         'export FIREBASE_PROJECT_ID="__FIREBASE_PROJECT_ID__"',
         'export FIREBASE_AUTH_DOMAIN="__FIREBASE_AUTH_DOMAIN__"',
         'export DOCKER_IMAGE="__DOCKER_IMAGE__"',
+        'export UPDATE_STATUS_URL="__UPDATE_STATUS_URL__"',
         "",
         "## --- Helper Functions ---",
         "start_service() {",
@@ -402,6 +407,12 @@ exports.getProvisionScript = functions.onRequest(
         'CONTAINER_NAME="__CONTAINER_NAME_VAR__"',
         'if sudo docker ps -a --format \'{{.Names}}\' | grep -q "^${CONTAINER_NAME}$"; then sudo docker stop "${CONTAINER_NAME}" > /dev/null 2>&1 && sudo docker rm "${CONTAINER_NAME}" > /dev/null 2>&1; fi',
         'sudo docker run -d --name "${CONTAINER_NAME}" --restart=always --network=host -e DEVICE_SERIAL -e DEVICE_ID -e PROVISIONING_INSTANCE_UUID -e FIREBASE_UID -e FIREBASE_CUSTOM_TOKEN -e FIREBASE_API_KEY -e FIREBASE_PROJECT_ID -e FIREBASE_AUTH_DOMAIN -e DOCKER_IMAGE "${DOCKER_IMAGE}"',
+        "",
+        "## --- Final Status Update ---",
+        'log_action "Reporting provisioning completion to the cloud..."',
+        "UPDATE_PAYLOAD=$(printf '{\"deviceId\": \"%s\", \"registered\": true, \"provisioningStatus\": \"provisioning_complete\"}' \"$DEVICE_ID\")",
+        "curl --fail -X POST -H \"Content-Type: application/json\" -d \"$UPDATE_PAYLOAD\" \"$UPDATE_STATUS_URL\"",
+        "",
         'log_action "--- ✅ Provisioning script execution completed. ---"',
         "exit 0",
       ];
@@ -427,7 +438,8 @@ exports.getProvisionScript = functions.onRequest(
         )
         .replace(/__DOCKER_IMAGE__/g, DEVICE_DOCKER_IMAGE)
         .replace(/__TAILSCALE_KEY__/g, tailscaleAuthKey)
-        .replace(/__CONTAINER_NAME_VAR__/g, containerName);
+        .replace(/__CONTAINER_NAME_VAR__/g, containerName)
+        .replace(/__UPDATE_STATUS_URL__/g, UPDATE_STATUS_URL);
 
       logger.info({
         message: "Provisioning script generated successfully.",

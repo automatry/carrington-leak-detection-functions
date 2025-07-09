@@ -1,17 +1,18 @@
-# This file specifies files that are *not* uploaded to Google Cloud
-# using gcloud. It follows the same syntax as .gitignore, with the addition of
-# "#!include" directives (which insert the entries of the given .gitignore-style
-# file at that point).
-#
-# For more information, run:
-#   $ gcloud topic gcloudignore
-#
-.gcloudignore
-# If you would like to upload your .git directory, .gitignore file or files
-# from your .gitignore file, remove the corresponding line
-# below:
+# This file tells the gcloud CLI (used by Firebase) what to ignore when deploying.
+
+# Default ignores
+node_modules
 .git
 .gitignore
 
-node_modules
-#!include:.gitignore
+# Firebase and other local debug files
+*.log
+firebase-debug.log
+firebase-debug.*.log
+*.local
+.env
+
+# Now, we explicitly UN-ignore the directories our Next.js server needs.
+# The '!' prefix is important. It means "do not ignore".
+!/.next
+!/public

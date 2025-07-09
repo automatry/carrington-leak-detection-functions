@@ -1,55 +1,49 @@
-// functions/firebase.js
+// functions/firebaseClient.js
 const admin = require("firebase-admin");
-const fs = require("fs"); // Import filesystem module to check file existence
-
-// --- FORCE PATH FOR TESTING ---
-// Hardcode the correct path with forward slashes for testing
-const explicitServiceAccountPath = "C:/Code/carrington-leak-detection-cloud/functions/keys/carrington-leak-detection-firebase-adminsdk-fbsvc-106694876f.json"; // Use your actual path
-console.log("Attempting to force service account path:", explicitServiceAccountPath);
-// --- END FORCE PATH ---
-
-// Use the explicitly defined path instead of process.env
-const serviceAccountPath = explicitServiceAccountPath;
-console.log("Using service account path:", serviceAccountPath);
+const fs = require("fs");
+const logger = require("firebase-functions/logger");
 
 let credential;
 
-// --- EXPLICIT CREDENTIAL LOADING ---
-if (serviceAccountPath) {
-  console.log(
-    `GOOGLE_APPLICATION_CREDENTIALS is set to: ${serviceAccountPath}`
+// --- Hybrid Credential Loading ---
+
+// Check if we are in ANY Firebase Emulator environment
+const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+
+if (isEmulator) {
+  logger.info(
+    "EMULATOR DETECTED. Forcing local service account key for initialization."
   );
-  // Check if the file actually exists before trying to load it
-  if (fs.existsSync(serviceAccountPath)) {
+  // This is the hardcoded path for local development ONLY.
+  const localServiceAccountPath =
+    "C:/Code/carrington-leak-detection-cloud/functions/keys/carrington-leak-detection-firebase-adminsdk-fbsvc-106694876f.json";
+
+  if (fs.existsSync(localServiceAccountPath)) {
     try {
-      // Attempt to load the credential directly from the specified path
-      credential = admin.credential.cert(serviceAccountPath);
-      console.log(
-        "Successfully created credential object from service account file."
+      credential = admin.credential.cert(localServiceAccountPath);
+      logger.info(
+        `Successfully initialized credentials for emulator from: ${localServiceAccountPath}`
       );
-    } catch (certError) {
-      console.error(
-        `!!! Error loading service account from ${serviceAccountPath}:`,
-        certError
+    } catch (e) {
+      logger.error(
+        `FATAL: Could not load the local service account file at ${localServiceAccountPath}. Please check the path.`,
+        { errorMessage: e.message }
       );
-      console.warn("Falling back to Application Default Credentials search.");
-      credential = admin.credential.applicationDefault(); // Fallback on error
+      process.exit(1);
     }
   } else {
-    console.error(
-      `!!! Service account file specified by GOOGLE_APPLICATION_CREDENTIALS not found at: ${serviceAccountPath}`
+    logger.error(
+      `FATAL: Local service account file not found at ${localServiceAccountPath}. This file is required to run the emulator.`
     );
-    console.warn("Falling back to Application Default Credentials search.");
-    credential = admin.credential.applicationDefault(); // Fallback if file not found
+    process.exit(1);
   }
 } else {
-  // If the environment variable wasn't set, use the standard ADC search
-  console.log(
-    "GOOGLE_APPLICATION_CREDENTIALS not set. Using Application Default Credentials search."
+  // This block runs ONLY when deployed to the cloud.
+  logger.info(
+    "NOT in an emulator. Using Application Default Credentials for deployed environment."
   );
   credential = admin.credential.applicationDefault();
 }
-// --- END EXPLICIT CREDENTIAL LOADING ---
 
 const projectId = process.env.GCLOUD_PROJECT || "carrington-leak-detection";
 const databaseURL = process.env.FIREBASE_DATABASE_EMULATOR_HOST
@@ -57,33 +51,18 @@ const databaseURL = process.env.FIREBASE_DATABASE_EMULATOR_HOST
   : `https://${projectId}.europe-west1.firebasedatabase.app`;
 
 if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      // --- Use the explicitly determined credential ---
-      credential: credential,
-      // --- End credential usage ---
-      projectId: projectId,
-      storageBucket: `${projectId}.appspot.com`,
-      databaseURL: databaseURL,
-    });
-    console.log(`Firebase Admin SDK initialized for project: ${projectId}`);
-    if (databaseURL) {
-      console.log(`Database URL configured: ${databaseURL}`);
-    } else {
-      console.log(
-        `Database URL not explicitly set; SDK may target RTDB emulator via env var.`
-      );
-    }
-    // Log credential type *after* initializeApp if possible (or check credential object before)
-    // console.log("Admin SDK initialized with credential type:", admin.app().options.credential?.constructor?.name || 'Unknown');
-  } catch (error) {
-    console.error("!!! Firebase Admin SDK initialization failed:", error);
-  }
+  admin.initializeApp({
+    credential: credential,
+    projectId: projectId,
+    storageBucket: `${projectId}.appspot.com`,
+    databaseURL: databaseURL,
+  });
+  logger.info(`Firebase Admin SDK initialized for project: ${projectId}`);
 } else {
-  console.log("Firebase Admin SDK already initialized.");
+  logger.info("Firebase Admin SDK already initialized.");
 }
 
-// --- Imports and Service Initializations (Remain the same) ---
+// --- Service Initializations ---
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore } = require("firebase-admin/firestore");
 const { getDatabase } = require("firebase-admin/database");
@@ -94,32 +73,21 @@ const rtdb = getDatabase();
 const storage = getStorage().bucket();
 const bigquery = new BigQuery();
 
-// --- STRICT EMULATOR DETECTION (Remains the same) ---
+// --- Emulator Detection Logging ---
 if (process.env.FIRESTORE_EMULATOR_HOST) {
-  const host = process.env.FIRESTORE_EMULATOR_HOST;
-  console.log(
-    `***** FIRESTORE_EMULATOR_HOST detected: ${host}. Applying Firestore Emulator settings. *****`
+  logger.info(
+    `***** FIRESTORE_EMULATOR_HOST detected: ${process.env.FIRESTORE_EMULATOR_HOST}. Using Firestore Emulator. *****`
   );
-  try {
-    db.settings({ host: host, ssl: false });
-    console.log(`Firestore SDK configured to use emulator at ${host}`);
-  } catch (emulatorError) {
-    console.warn(
-      "Could not apply Firestore Emulator settings:",
-      emulatorError.message
-    );
-  }
 } else {
-  console.log("FIRESTORE_EMULATOR_HOST not set. Targeting LIVE Firestore.");
+  logger.info("FIRESTORE_EMULATOR_HOST not set. Targeting LIVE Firestore.");
 }
 
 if (process.env.FIREBASE_DATABASE_EMULATOR_HOST) {
-  console.log(
-    `RTDB Emulator target detected: ${process.env.FIREBASE_DATABASE_EMULATOR_HOST}. SDK will target emulator.`
+  logger.info(
+    `***** RTDB_EMULATOR_HOST detected: ${process.env.FIREBASE_DATABASE_EMULATOR_HOST}. Using RTDB Emulator. *****`
   );
 } else {
-  console.log("FIREBASE_DATABASE_EMULATOR_HOST not set. Targeting LIVE RTDB.");
+  logger.info("FIREBASE_DATABASE_EMULATOR_HOST not set. Targeting LIVE RTDB.");
 }
-// --- END STRICT EMULATOR DETECTION ---
 
 module.exports = { admin, db, rtdb, storage, bigquery };

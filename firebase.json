@@ -9,23 +9,20 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "*.local",
-        ".env",
-        ".next",
-        "functions/keys/",
-        "/keys"
+        ".env"
       ],
-      "predeploy": ["npm run predeploy"],
+      "predeploy": [
+        "npm run build-and-copy"
+      ],
       "defaultRegion": "europe-west1",
       "serviceAccount": "firebase-adminsdk-fbsvc@carrington-leak-detection.iam.gserviceaccount.com"
     }
   ],
   "hosting": {
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      {
-        "source": "**",
-        "function": "nextServer"
-      }
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
     ]
   },
   "storage": {

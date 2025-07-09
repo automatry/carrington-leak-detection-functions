@@ -1,8 +1,16 @@
 {
-  "name": "carrington-leak-detection",
+  "name": "carrington-leak-detection-cloud",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "predeploy": "cd client && npm install && npm run build"
-  }
+    "dev": "npm run build-and-copy && firebase emulators:start --only functions,hosting",
+    "build-and-copy": "npm run build --workspace=client && npm run copy --workspace=functions",
+    "deploy:functions": "npm run build-and-copy && firebase deploy --only functions",
+    "deploy:hosting": "npm run build-and-copy && firebase deploy --only hosting",
+    "deploy:all": "npm run build-and-copy && firebase deploy"
+  },
+  "workspaces": [
+    "client",
+    "functions"
+  ]
 }

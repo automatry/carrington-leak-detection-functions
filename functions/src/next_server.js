@@ -2,15 +2,41 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const next = require("next");
 const path = require("path");
+const logger = require("firebase-functions/logger");
+const fs = require('fs'); // Import fs for debugging
 
-// This function will be referenced in firebase.json to serve the Next.js app.
-// It points to the 'client' directory where your Next.js project lives.
+// The 'functions' directory is the logical "project root" for the Next.js server
+// when it runs as a Cloud Function.
+const serverProjectRoot = path.resolve(__dirname, "..");
+const buildDir = path.join(serverProjectRoot, '.next');
+
+// --- Pre-flight Check for Debugging ---
+logger.info("nextServer: Initializing...", {
+    serverProjectRoot,
+    buildDir
+});
+try {
+    const filesInWorkspace = fs.readdirSync('/workspace');
+    logger.info("Files in /workspace:", { files: filesInWorkspace });
+
+    if(fs.existsSync(buildDir)) {
+        const filesInBuildDir = fs.readdirSync(buildDir);
+        // Log the first 10 files/folders to avoid overly long log entries
+        logger.info("Build directory found. Files inside .next:", { files: filesInBuildDir.slice(0, 10) });
+    } else {
+        logger.error("Build directory NOT FOUND at expected path.", { expectedPath: buildDir });
+    }
+} catch (e) {
+    logger.error("Error during pre-flight directory check:", { error: e.message });
+}
+// --- End Pre-flight Check ---
+
 const nextApp = next({
-  dev: false, // This is CRITICAL for production
+  dev: false,
+  dir: serverProjectRoot, // Explicitly set the project directory for Next.js
   conf: {
-    // The distDir must match the .next folder that `npm run build` creates inside the client directory.
-    // We resolve the path from the functions directory to the client directory.
-    distDir: path.resolve(__dirname, "../../client/.next"),
+    // The 'distDir' is relative to 'dir', so this points to './functions/.next'
+    distDir: ".next",
   },
 });
 
@@ -18,13 +44,22 @@ const handle = nextApp.getRequestHandler();
 
 exports.nextServer = onRequest(
   {
-    region: "europe-west1", // Match your other functions
-    memory: "1GiB", // Recommended for Next.js SSR
-    timeoutSeconds: 60, // Give it time to render
+    region: "europe-west1",
+    memory: "1GiB",
+    timeoutSeconds: 60,
   },
   async (req, res) => {
-    // This will prepare the Next.js app on the first request.
-    await nextApp.prepare();
-    return handle(req, res);
+    try {
+      // The prepare call will now correctly find the build output before handling requests.
+      await nextApp.prepare();
+      return handle(req, res);
+    } catch (error) {
+      logger.error("Next.js server failed to handle request", {
+        errorMessage: error.message,
+        stack: error.stack,
+        url: req.originalUrl,
+      });
+      res.status(500).send("Internal Server Error: Could not start Next.js server.");
+    }
   }
 );
