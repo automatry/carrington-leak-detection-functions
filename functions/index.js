@@ -10,7 +10,6 @@ const { ingestLogs } = require("./src/ingestLogs");                 // HTTP
 const { getProvisionScript } = require("./src/getProvisionScript");     // HTTP
 const { notifyStatusChange } = require("./src/notifyStatusChange");     // Firestore Trigger
 const { processLogFile } = require("./src/processLogFile");         // Assumed Background Trigger (e.g., Storage)
-const { nextServer } = require("./src/next_server"); // <-- Import the Next.js server
 const { registerDevice, checkDeviceStatus } = require("./src/deviceRegistration"); // <-- NEW
 
 logger.info("Importing function modules completed.");
@@ -48,9 +47,6 @@ exports.getProvisionScript = onRequest({
 exports.registerDevice = registerDevice;
 exports.checkDeviceStatus = checkDeviceStatus;
 // --- END NEW ---
-
-// --- NEW: Export the Next.js server function ---
-exports.nextServer = nextServer;
 
 
 // --- Background Function Exports ---

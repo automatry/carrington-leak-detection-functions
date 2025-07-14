@@ -52,7 +52,7 @@ install_if_missing dmidecode dmidecode
 log_action "Retrieving system serial number via dmidecode..."
 SERIAL_NUMBER=""
 if command -v dmidecode &> /dev/null; then
-  SERIAL_NUMBER=$(sudo dmidecode -s system-serial-number 2>/dev/null | tr -d '[:space:]')
+  SERIAL_NUMBER=$(sudo dmidecode -s system-serial-number 2>/dev/null | tr -d '[:space:]') || true
 fi
 
 if [ -z "$SERIAL_NUMBER" ] || [[ "$SERIAL_NUMBER" == "NotSpecified" ]]; then
@@ -114,19 +114,26 @@ while true; do
       if [ -n "$SCRIPT_URL" ] && [ "$SCRIPT_URL" != "null" ]; then
         log_action "Approved! Downloading provision script..."
         mkdir -p "$(dirname "$PROVISION_SCRIPT_PATH")"
-        curl -L --fail -o "$PROVISION_SCRIPT_PATH" "$SCRIPT_URL"
-        if [ -s "$PROVISION_SCRIPT_PATH" ]; then
-          log_action "Script downloaded; executing..."
-          chmod +x "$PROVISION_SCRIPT_PATH"
-          ( sudo "$PROVISION_SCRIPT_PATH" ) &
-          log_action "Provisioning started; exiting registration script."
-          exit 0
+        if curl -L --fail -o "$PROVISION_SCRIPT_PATH" "$SCRIPT_URL"; then
+          if [ -s "$PROVISION_SCRIPT_PATH" ]; then
+            log_action "Script downloaded; attempting to execute..."
+            chmod +x "$PROVISION_SCRIPT_PATH"
+            if sudo "$PROVISION_SCRIPT_PATH"; then
+              log_action "Provisioning script executed successfully."
+              exit 0
+            else
+              log_action "ERROR: Provisioning script execution failed. Will retry."
+            fi
+          else
+            log_action "ERROR: Downloaded script is empty. Retrying next poll."
+            rm -f "$PROVISION_SCRIPT_PATH"
+          fi
         else
-          log_action "ERROR: Downloaded script is empty. Retrying next poll."
+          log_action "ERROR: Failed to download provision script (HTTP error). Will retry."
           rm -f "$PROVISION_SCRIPT_PATH"
         fi
       else
-        log_action "ERROR: approved but no scriptUrl provided."
+        log_action "ERROR: approved but no scriptUrl provided. Will retry."
       fi
     fi
   else
