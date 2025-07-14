@@ -77,5 +77,7 @@ project-export.txt
 functions/.next
 client/.next
 
+/functions-backup
+
 
 # functions/src/docker-puller-key.json
