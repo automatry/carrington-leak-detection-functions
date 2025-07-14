@@ -1,0 +1,90 @@
+/* client/src/app/settings/page.module.css */
+.settingsSection {
+    margin-bottom: 2.5rem;
+    padding: 2rem;
+    background-color: rgb(var(--card-rgb));
+    border: 1px solid rgb(var(--card-border-rgb));
+    border-radius: var(--border-radius);
+}
+
+.settingsSection h2 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    color: rgb(var(--primary-rgb));
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgb(var(--card-border-rgb));
+}
+
+.settingsSection .description {
+    font-size: 0.9rem;
+    color: rgb(var(--secondary-rgb));
+    margin-bottom: 1.5rem;
+}
+
+.fieldGroup {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.fieldGroup label {
+    font-weight: 500;
+}
+
+.fieldGroup input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: rgb(var(--primary-rgb));
+    cursor: pointer;
+}
+
+.templateTabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 1px solid rgb(var(--card-border-rgb));
+    margin-bottom: 2rem;
+}
+
+.templateTabs button {
+    padding: 0.8rem 1.2rem;
+    border: none;
+    border-bottom: 3px solid transparent;
+    background-color: transparent;
+    color: rgb(var(--secondary-rgb));
+    cursor: pointer;
+    font-size: 0.95rem;
+    text-transform: capitalize;
+    transition: all 0.2s ease-in-out;
+}
+
+.templateTabs button:hover {
+    background-color: rgba(var(--primary-rgb), 0.1);
+    color: rgb(var(--primary-rgb));
+}
+
+.templateTabs button.activeTab {
+    color: rgb(var(--primary-rgb));
+    font-weight: 600;
+    border-bottom-color: rgb(var(--primary-rgb));
+}
+
+.saveActions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background-color: rgb(var(--card-rgb));
+    border: 1px solid rgb(var(--card-border-rgb));
+    border-radius: var(--border-radius);
+    position: sticky;
+    bottom: 1rem;
+    z-index: 100;
+}
+
+.saveStatus {
+    font-size: 0.9rem;
+    color: rgb(var(--success-rgb));
+}

@@ -1,0 +1,87 @@
+/* client/src/app/components/RecipientManager.module.css */
+.form {
+    background-color: rgb(var(--card-rgb));
+    border: 1px solid rgb(var(--card-border-rgb));
+    border-radius: var(--border-radius);
+    padding: 1.5rem 2rem;
+}
+  
+.fieldset {
+    border: 1px solid rgba(var(--card-border-rgb), 0.7);
+    border-radius: calc(var(--border-radius) / 1.5);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.fieldset legend {
+    padding: 0 0.8rem;
+    font-weight: 600;
+    color: rgb(var(--primary-rgb));
+}
+
+.recipientRow {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.recipientRow input,
+.recipientRow select {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid rgb(var(--card-border-rgb));
+    background-color: rgba(var(--background-rgb), 0.5);
+    color: rgb(var(--foreground-rgb));
+    border-radius: calc(var(--border-radius) / 1.5);
+    font-size: 0.95rem;
+    transition: border-color 0.2s ease;
+}
+
+.recipientRow input:focus,
+.recipientRow select:focus {
+    outline: none;
+    border-color: rgb(var(--primary-rgb));
+}
+
+.recipientRow input[type="text"] {
+    flex: 1 1 25%;
+}
+.recipientRow input[type="email"],
+.recipientRow input[type="tel"] {
+    flex: 1 1 40%;
+}
+.recipientRow select {
+    flex: 1 1 20%;
+}
+
+.inputError {
+    border-color: rgb(var(--error-rgb)) !important;
+}
+
+.removeButton {
+    background: none;
+    border: none;
+    color: rgb(var(--error-rgb));
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.2rem;
+    flex-shrink: 0;
+}
+.removeButton:hover {
+    opacity: 0.8;
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgb(var(--card-border-rgb));
+}
+  
+.actions button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

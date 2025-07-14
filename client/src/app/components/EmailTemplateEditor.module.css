@@ -1,0 +1,87 @@
+/* client/src/app/components/EmailTemplateEditor.module.css */
+.editorContainer {
+    display: flex;
+    gap: 2rem;
+}
+
+.formSection {
+    flex: 2 1 60%;
+    display: flex;
+    flex-direction: column;
+}
+
+.formSection label {
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+    color: rgb(var(--secondary-rgb));
+}
+
+.formSection input,
+.formSection textarea {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid rgb(var(--card-border-rgb));
+    background-color: rgba(var(--background-rgb), 0.5);
+    color: rgb(var(--foreground-rgb));
+    border-radius: calc(var(--border-radius) / 1.5);
+    font-size: 0.95rem;
+    transition: border-color 0.2s ease;
+    font-family: inherit;
+}
+.formSection textarea {
+    font-family: Consolas, 'Courier New', monospace;
+    min-height: 300px;
+}
+
+.formSection input:focus,
+.formSection textarea:focus {
+    outline: none;
+    border-color: rgb(var(--primary-rgb));
+}
+
+.placeholdersSection {
+    flex: 1 1 35%;
+    background-color: rgba(var(--card-rgb), 0.5);
+    padding: 1.5rem;
+    border: 1px solid rgb(var(--card-border-rgb));
+    border-radius: var(--border-radius);
+}
+
+.placeholdersSection h4 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    color: rgb(var(--primary-rgb));
+}
+
+.placeholdersSection p {
+    font-size: 0.85rem;
+    color: rgb(var(--secondary-rgb));
+    margin-bottom: 1rem;
+}
+
+.placeholdersSection ul {
+    list-style: none;
+    padding: 0;
+    font-size: 0.9rem;
+}
+
+.placeholdersSection li {
+    margin-bottom: 0.5rem;
+}
+
+.placeholdersSection code {
+    background-color: rgba(var(--foreground-rgb), 0.1);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-family: Consolas, 'Courier New', monospace;
+}
+
+.backendNote {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px dashed rgb(var(--card-border-rgb));
+    font-size: 0.8rem;
+    color: rgb(var(--warning-rgb));
+    line-height: 1.4;
+}

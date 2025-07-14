@@ -48,6 +48,7 @@ const registerDevice = onRequest(
       // --- CRITICAL FIX: SERVER-SIDE SANITIZATION ---
       // This removes all non-printable ASCII control characters (like \r, \n, etc.)
       // and trims whitespace from the beginning and end. This is the definitive fix.
+      // eslint-disable-next-line no-control-regex
       const sanitizedSerial = serial.replace(/[\x00-\x1F\x7F-\x9F]/g, "").trim();
       
       if (sanitizedSerial.length === 0) {

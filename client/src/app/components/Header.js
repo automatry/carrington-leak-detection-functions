@@ -17,6 +17,7 @@ export default function Header() {
          {user && ( // Show nav links only if logged in
             <>
                 <Link href="/devices" className={styles.navLink}>Devices</Link>
+                <Link href="/recipients" className={styles.navLink}>Recipients</Link>
                 <Link href="/notifications" className={styles.navLink}>Notifications</Link>
                 <Link href="/settings" className={styles.navLink}>Settings</Link>
             </>

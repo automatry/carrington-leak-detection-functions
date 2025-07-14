@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const outputFile = path.join(__dirname, 'project-export.txt');
-const ignoredDirs = ['node_modules', '.git', 'dist', 'build', 'out', 'lib', '.next','.firebase'];
+const ignoredDirs = ['node_modules', '.git', 'dist', 'build', 'out', 'lib', '.next','.firebase', 'functions-backup'];
 const ignoredFiles = ['package-lock.json', 'firebase-debug.log', 'firebase-debug.log.1', 'database-debug.log', 'database-debug.log.1', 'firebase-debug.log', 'firestore-debug.log'];
 
 // Files to always include even if they don't have typical extensions

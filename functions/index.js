@@ -11,6 +11,8 @@ const { getProvisionScript } = require("./src/getProvisionScript");     // HTTP
 const { notifyStatusChange } = require("./src/notifyStatusChange");     // Firestore Trigger
 const { processLogFile } = require("./src/processLogFile");         // Assumed Background Trigger (e.g., Storage)
 const { registerDevice, checkDeviceStatus } = require("./src/deviceRegistration"); // <-- NEW
+const { triggerTestNotification } = require("./src/triggerTestNotification"); // <-- NEW
+const { getBootstrapScript } = require("./src/getBootstrapScript"); // <-- NEW
 
 logger.info("Importing function modules completed.");
 
@@ -43,10 +45,16 @@ exports.getProvisionScript = onRequest({
   getProvisionScript(req, res);
 });
 
+// --- Public Bootstrap Endpoint ---
+exports.getBootstrapScript = getBootstrapScript;
+
 // --- NEW Device Registration Endpoints ---
 exports.registerDevice = registerDevice;
 exports.checkDeviceStatus = checkDeviceStatus;
 // --- END NEW ---
+
+// --- Callable Function Exports ---
+exports.triggerTestNotification = triggerTestNotification;
 
 
 // --- Background Function Exports ---

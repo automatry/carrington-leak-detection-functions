@@ -1,5 +1,4 @@
 /* eslint-disable no-useless-escape */
-/* eslint-disable quotes */
 // functions/src/getProvisionScript.js
 const { onRequest } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
@@ -182,34 +181,6 @@ install_nomachine() {
     log_action "NoMachine installed successfully."
 }
 
-install_openssh() {
-    log_action "Checking for OpenSSH Server..."
-    if command -v sshd &> /dev/null; then
-        log_action "OpenSSH Server is already installed."
-        return 0
-    fi
-
-    report_status "installing_openssh"
-    log_action "Installing OpenSSH server package..."
-    # Running apt-get update first is good practice before an install
-    sudo apt-get update -y
-    sudo apt-get install -y openssh-server
-
-    log_action "Ensuring SSH service is enabled and running..."
-    sudo systemctl enable --now ssh
-
-    # Optional: Check for UFW firewall and open port 22 if it's active
-    if command -v ufw &> /dev/null && sudo ufw status | grep -q 'Status: active'; then
-        log_action "UFW firewall is active. Allowing SSH connections on port 22."
-        sudo ufw allow ssh
-    else
-        log_action "UFW not active or not installed. Skipping firewall rule for SSH."
-    fi
-    
-    log_action "IMPORTANT: OpenSSH server is installed. To use, manage authorized_keys for user accounts manually or through a separate configuration management process."
-    log_action "OpenSSH Server installed successfully."
-}
-
 # --- Main Execution ---
 log_action "--- 🚀 Starting Full Provisioning Process for ${serial} ---"
 
@@ -233,7 +204,6 @@ EOF
 report_status "installing_dependencies"
 install_tailscale
 install_nomachine
-install_openssh
 
 if ! command -v docker &> /dev/null; then
     log_action "Docker not found. Installing docker.io..."
@@ -242,14 +212,12 @@ else
     log_action "Docker is already installed."
 fi
 
-report_status "configuring_services"
+report_status "configuring_tailscale"
 log_action "Enabling and starting tailscaled service..."
 sudo systemctl enable --now tailscaled
 
-log_action "Connecting to tailnet as '${serial}' and enabling SSH..."
-# The --ssh flag enables Tailscale's built-in SSH server.
-# Access control is managed via Tailscale ACLs in the admin console.
-sudo tailscale up --authkey="${tailscaleAuthKey}" --hostname="${serial}" --accept-routes --ssh
+log_action "Connecting to tailnet as '${serial}'..."
+sudo tailscale up --authkey="${tailscaleAuthKey}" --hostname="${serial}" --accept-routes
 
 report_status "authenticating_docker"
 log_action "Creating persistent Docker pull credentials at \${HOST_CREDENTIAL_PATH}..."
@@ -362,6 +330,7 @@ exports.getProvisionScript = onRequest(
       }
       await doc.ref.update(updatePayload);
 
+      // --- FIX: Correctly parse the registry host from the full image name ---
       const registryHost = config.deviceDockerImage.split('/')[0];
       if (!registryHost.includes('docker.pkg.dev')) {
           const errorMessage = `Invalid DEVICE_DOCKER_IMAGE format: ${config.deviceDockerImage}. Expected a docker.pkg.dev host.`;
@@ -378,7 +347,7 @@ exports.getProvisionScript = onRequest(
         tailscaleAuthKey,
         containerName: "bacnet-reader-service",
         dockerPullerKeyJson: secrets.dockerPullerKey,
-        registryHost, 
+        registryHost, // Pass the correct host to the script generator
         deviceUpdateTokenValue: secrets.deviceUpdateToken,
       });
 

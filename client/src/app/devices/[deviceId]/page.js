@@ -5,12 +5,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 // Import necessary Firestore functions for delete
 import { doc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '@/lib/firebaseClient'; // Corrected path
 import AuthGuard from "@/app/components/AuthGuard"; // Corrected path
 import LoadingSpinner from '@/app/components/LoadingSpinner'; // Corrected path
 import DeviceDetailView from '@/app/components/DeviceDetailView'; // Use the updated one below
 import DeviceConfigForm from '@/app/components/DeviceConfigForm'; // Use the updated one below
 import styles from "@/app/styles/Page.module.css"; // Corrected path
+
+// Lazy-load the functions instance
+let functions;
+let triggerTestNotification;
 
 export default function DeviceDetailPage() {
   const params = useParams();
@@ -24,6 +29,12 @@ export default function DeviceDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [isApproving, setIsApproving] = useState(false);
+  
+  // --- New State for Test Notification Modal ---
+  const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [testSendResult, setTestSendResult] = useState(null);
+  const [testChannels, setTestChannels] = useState({ email: true, sms: true });
 
   useEffect(() => {
     if (!deviceId) {
@@ -131,6 +142,43 @@ export default function DeviceDetailPage() {
       }
   };
 
+  const handleSendTestNotification = async () => {
+    if (!deviceId) return;
+    if (!testChannels.email && !testChannels.sms) {
+        setTestSendResult({ type: 'error', message: 'Please select at least one channel (Email or SMS).' });
+        return;
+    }
+
+    setIsSendingTest(true);
+    setTestSendResult(null);
+
+    try {
+        if (!functions) {
+            functions = getFunctions(firebaseApp, 'europe-west1');
+            triggerTestNotification = httpsCallable(functions, 'triggerTestNotification');
+        }
+        const result = await triggerTestNotification({ 
+            deviceId,
+            sendEmail: testChannels.email,
+            sendSms: testChannels.sms
+        });
+        setTestSendResult({ type: 'success', message: result.data.message });
+    } catch (error) {
+        console.error("Error sending test notification:", error);
+        setTestSendResult({ type: 'error', message: `Failed: ${error.message}` });
+    } finally {
+        setIsSendingTest(false);
+        setTimeout(() => setIsTestModalOpen(false), 3000); // Close modal after 3 seconds
+    }
+  };
+
+  const openTestModal = () => {
+    setTestSendResult(null);
+    setIsSendingTest(false);
+    setTestChannels({ email: true, sms: true });
+    setIsTestModalOpen(true);
+  };
+
   if (loading) return <AuthGuard><LoadingSpinner /></AuthGuard>; 
 
   return (
@@ -154,7 +202,10 @@ export default function DeviceDetailPage() {
                 <div className={styles.actionsContainer} style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent:'flex-end', flexWrap: 'wrap' }}>
                    {deleteError && <p className="error-message" style={{margin: 0, alignSelf:'center', flexGrow:1}}>{deleteError}</p>}
                    
-                   {/* Tweaked Approval Button Logic/Text */ }
+                    <button onClick={openTestModal} className="button button-secondary">Send Test Notification</button>
+
+                   <button onClick={() => router.push('/recipients')} className="button button-secondary">Manage Recipients</button>
+                   
                    {deviceData.provisioningStatus !== 'provisioning_complete' && (
                      <button
                        onClick={handleApprovalToggle}
@@ -194,6 +245,37 @@ export default function DeviceDetailPage() {
           </>
         )}
       </div>
+
+      {isTestModalOpen && (
+        <div className="modal-backdrop">
+            <div className="modal-content">
+                <h3>Send Test Notification</h3>
+                <p>Select channels and send a test notification for this device.</p>
+                <div className="checkbox-group">
+                    <label>
+                        <input type="checkbox" checked={testChannels.email} onChange={e => setTestChannels(p => ({...p, email: e.target.checked}))} />
+                        Send Email
+                    </label>
+                    <label>
+                        <input type="checkbox" checked={testChannels.sms} onChange={e => setTestChannels(p => ({...p, sms: e.target.checked}))} />
+                        Send SMS
+                    </label>
+                </div>
+                <div className="modal-actions">
+                    <button onClick={() => setIsTestModalOpen(false)} disabled={isSendingTest} className="button button-secondary">Cancel</button>
+                    <button onClick={handleSendTestNotification} disabled={isSendingTest} className="button">
+                        {isSendingTest ? <LoadingSpinner size="small" /> : 'Send Test'}
+                    </button>
+                </div>
+                {testSendResult && (
+                    <p className={`modal-result ${testSendResult.type === 'error' ? 'result-error' : 'result-success'}`}>
+                        {testSendResult.message}
+                    </p>
+                )}
+            </div>
+        </div>
+      )}
+
       <style jsx>{`
         .error-message {
           color: rgb(var(--error-rgb));
@@ -203,6 +285,66 @@ export default function DeviceDetailPage() {
           border: 1px solid rgba(var(--error-rgb), 0.3);
           margin-bottom: 1.5rem;
           font-size: 0.9rem;
+        }
+        .modal-backdrop {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .modal-content {
+            background-color: rgb(var(--card-rgb));
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            border: 1px solid rgb(var(--card-border-rgb));
+            width: 90%;
+            max-width: 500px;
+        }
+        .modal-content h3 {
+            margin-bottom: 0.5rem;
+            color: rgb(var(--primary-rgb));
+        }
+        .modal-content p {
+            margin-bottom: 1.5rem;
+            color: rgb(var(--secondary-rgb));
+        }
+        .checkbox-group {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .checkbox-group input {
+            width: 18px; height: 18px;
+            accent-color: rgb(var(--primary-rgb));
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+        .modal-result {
+            margin-top: 1rem;
+            padding: 0.8rem;
+            border-radius: calc(var(--border-radius) / 2);
+            text-align: center;
+        }
+        .result-success {
+            background-color: rgba(var(--success-rgb), 0.2);
+            color: rgb(var(--success-rgb));
+        }
+        .result-error {
+            background-color: rgba(var(--error-rgb), 0.2);
+            color: rgb(var(--error-rgb));
         }
       `}</style>
     </AuthGuard>
