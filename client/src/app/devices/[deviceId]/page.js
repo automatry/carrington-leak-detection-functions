@@ -3,18 +3,16 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-// Import necessary Firestore functions for delete
 import { doc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { db } from '@/lib/firebaseClient'; // Corrected path
-import AuthGuard from "@/app/components/AuthGuard"; // Corrected path
-import LoadingSpinner from '@/app/components/LoadingSpinner'; // Corrected path
-import DeviceDetailView from '@/app/components/DeviceDetailView'; // Use the updated one below
-import DeviceConfigForm from '@/app/components/DeviceConfigForm'; // Use the updated one below
-import styles from "@/app/styles/Page.module.css"; // Corrected path
+import { httpsCallable } from 'firebase/functions';
+import { db, firebaseFunctions } from '@/lib/firebaseClient'; // CORRECTED IMPORT
+import AuthGuard from "@/app/components/AuthGuard";
+import LoadingSpinner from '@/app/components/LoadingSpinner';
+import DeviceDetailView from '@/app/components/DeviceDetailView';
+import DeviceConfigForm from '@/app/components/DeviceConfigForm';
+import styles from "@/app/styles/Page.module.css";
 
-// Lazy-load the functions instance
-let functions;
+// Lazy-load the callable function reference
 let triggerTestNotification;
 
 export default function DeviceDetailPage() {
@@ -153,9 +151,8 @@ export default function DeviceDetailPage() {
     setTestSendResult(null);
 
     try {
-        if (!functions) {
-            functions = getFunctions(firebaseApp, 'europe-west1');
-            triggerTestNotification = httpsCallable(functions, 'triggerTestNotification');
+        if (!triggerTestNotification) {
+            triggerTestNotification = httpsCallable(firebaseFunctions, 'triggerTestNotification');
         }
         const result = await triggerTestNotification({ 
             deviceId,

@@ -1,5 +1,4 @@
 /* components/DeviceCard.module.css */
-/* components/DeviceCard.module.css */
 .cardLink {
   display: block;
   text-decoration: none;
@@ -16,13 +15,23 @@
   border: 1px solid rgb(var(--card-border-rgb));
   border-radius: var(--border-radius);
   padding: 1.2rem;
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
 }
 .cardContainer:hover {
   transform: translateY(-3px);
   box-shadow: 0 4px 10px rgba(var(--primary-rgb), 0.3);
   border-color: rgba(var(--primary-rgb), 0.5);
 }
+
+/* --- NEW: Style for stale device indicator --- */
+.cardContainer.stale {
+  border-color: rgb(var(--warning-rgb));
+}
+.cardContainer.stale:hover {
+  box-shadow: 0 4px 10px rgba(var(--warning-rgb), 0.4);
+}
+/* --- END NEW --- */
+
 
 .card {
   display: flex;
@@ -34,7 +43,6 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  /* Reduced margin below header */
   margin-bottom: 0.5rem;
   gap: 0.8rem;
 }
@@ -42,7 +50,7 @@
 .titleSection {
     display: flex;
     flex-direction: column;
-    gap: 0.1rem; /* Small gap between title lines */
+    gap: 0.1rem;
     flex-grow: 1;
     min-width: 0;
 }
@@ -60,7 +68,7 @@
     font-weight: 400;
     font-size: 0.95rem;
     color: rgb(var(--secondary-rgb));
-    margin: 0; /* Remove specific margins */
+    margin: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -70,7 +78,7 @@
     font-weight: 400;
     font-size: 0.8rem;
     color: rgba(var(--secondary-rgb), 0.8);
-    margin: 0; /* Remove specific margins */
+    margin: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -92,18 +100,15 @@
   white-space: nowrap;
   background-color: rgba(var(--foreground-rgb), 0.1);
   border: 1px solid transparent;
-  /* --- Added for consistent sizing --- */
-  min-width: 100px; /* Adjust as needed based on longest text */
+  min-width: 100px;
   text-align: center;
-  display: inline-block; /* Or flex if needed */
-  /* --- End sizing --- */
+  display: inline-block;
+  text-transform: capitalize; /* Better formatting for status text */
 }
 
-/* Project section - adjust spacing if needed */
 .project {
   font-size: 0.85rem;
   color: rgb(var(--secondary-rgb));
-  /* Reduced margin below project */
   margin-bottom: 0.8rem;
   white-space: nowrap;
   overflow: hidden;
@@ -113,7 +118,7 @@
 .infoGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.4rem 1rem; /* Adjusted row gap */
+  gap: 0.4rem 1rem;
   margin-bottom: 1rem;
   font-size: 0.9rem;
 }
@@ -139,9 +144,23 @@
   text-overflow: ellipsis;
 }
 
-/* Footer section for sensor/points */
+/* --- NEW: Stale value and indicator styles --- */
+.staleValue {
+  color: rgb(var(--warning-rgb));
+  font-weight: 600;
+}
+
+.staleIndicator {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.2rem;
+  font-size: 1.1em;
+}
+/* --- END NEW --- */
+
+
 .footerSection {
-  margin-top: auto; /* Pushes this section down */
+  margin-top: auto;
   padding-top: 0.8rem;
   border-top: 1px dashed rgba(var(--card-border-rgb), 0.5);
 }
@@ -152,7 +171,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 0.3rem; /* Space before point count */
+  margin-bottom: 0.3rem;
 }
 .primarySensorInfo span:last-child {
     display: inline-block;
@@ -163,10 +182,9 @@
 .pointCount {
   font-size: 0.8rem;
   color: rgb(var(--secondary-rgb));
-  /* margin-top: 0.5rem; Removed, spacing handled by parent gap */
 }
 
-/* Status Styling (Same as before) */
+/* Status Styling */
 .statusProvisioned { background-color: rgba(var(--success-rgb), 0.2); color: rgb(var(--success-rgb)); border-color: rgba(var(--success-rgb), 0.4); }
 .statusNotProvisioned { background-color: rgba(var(--offline-rgb), 0.2); color: rgb(var(--offline-rgb)); border-color: rgba(var(--offline-rgb), 0.4);}
 .statusCommissioned { background-color: rgba(var(--primary-rgb), 0.2); color: rgb(var(--primary-rgb)); border-color: rgba(var(--primary-rgb), 0.4);}
@@ -181,63 +199,68 @@
 /* --- Provision button and Error Section --- */
 .provisionSection {
   display: flex;
-  flex-direction: column; /* Stack button and error */
-  align-items: center; /* Center items */
-  gap: 0.4rem; /* Space between button and error */
-  margin-top: 0.5rem; /* Consistent gap, adjust if needed */
-  width: 100%; /* Take full width for centering */
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem; /* Increased gap for multiple buttons/errors */
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.provisionButton, .approveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: auto;
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: calc(var(--border-radius) / 1.5);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease-in-out, opacity 0.2s ease;
+  text-decoration: none;
+  flex-shrink: 0;
 }
 
 .provisionButton {
-display: inline-flex; /* Use inline-flex for spinner alignment */
-align-items: center;
-justify-content: center;
-gap: 0.5rem; /* Space between spinner and text */
-width: auto;
-padding: 0.4rem 0.8rem;
-background-color: rgb(var(--secondary-rgb));
-color: rgb(var(--foreground-rgb));
-border: none;
-border-radius: calc(var(--border-radius) / 1.5);
-cursor: pointer;
-font-size: 0.8rem;
-transition: background-color 0.2s ease-in-out, opacity 0.2s ease;
-text-decoration: none;
-flex-shrink: 0;
+  background-color: rgb(var(--secondary-rgb));
+  color: rgb(var(--foreground-rgb));
+}
+.provisionButton:hover:not(:disabled) {
+  background-color: rgba(var(--secondary-rgb), 0.8);
 }
 
-.provisionButton:hover:not(:disabled) { /* Add :not(:disabled) */
-background-color: rgba(var(--secondary-rgb), 0.8);
+/* --- NEW: Approve Button Style --- */
+.approveButton {
+  background-color: rgb(var(--success-rgb));
+  color: #fff; /* White text on green for contrast */
 }
+.approveButton:hover:not(:disabled) {
+  background-color: rgba(var(--success-rgb), 0.8);
+}
+/* --- END NEW --- */
 
-.provisionButton:disabled {
+
+.provisionButton:disabled, .approveButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
 /* Style for the loading spinner inside the button */
-.provisionButton > span {
-  display: inline-block; /* Keep text on same line */
+.provisionButton > span, .approveButton > span {
+  display: inline-block;
 }
-/* Assuming LoadingSpinner component renders a div/span */
-.provisionButton > div, .provisionButton > span[role="status"] { /* Target spinner specifically */
-  width: 1em; /* Adjust size as needed */
+.provisionButton > div, .approveButton > div,
+.provisionButton > span[role="status"], .approveButton > span[role="status"] {
+  width: 1em;
   height: 1em;
-  /* Add spinner specific styles if LoadingSpinner doesn't handle it */
 }
-
 
 .downloadErrorText {
   font-size: 0.8rem;
   color: rgb(var(--error-rgb));
   text-align: center;
   width: 100%;
-  margin: 0; /* Reset default margin */
+  margin: 0;
 }
-
-/* --- End Provision section --- */
-
-/* --- Status Styling --- (Keep all previous status styles) */
-.statusProvisioned { background-color: rgba(var(--success-rgb), 0.2); color: rgb(var(--success-rgb)); border-color: rgba(var(--success-rgb), 0.4); }
-.statusNotProvisioned { background-color: rgba(var(--offline-rgb), 0.2); color: rgb(var(--offline-rgb)); border-color: rgba(var(--offline-rgb), 0.4);}
-/* ... etc ... */

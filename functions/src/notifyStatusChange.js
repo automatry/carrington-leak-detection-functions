@@ -1,9 +1,10 @@
+/* eslint-disable quotes */
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const sgMail = require("@sendgrid/mail");
 const logger = require("firebase-functions/logger");
-const { db } = require("../firebaseClient");
-const { renderNotificationHTML } = require("./emailTemplates");
+const { db } = require("../firebaseAdmin");
+const { renderNotificationHTML, generateSmsText } = require("./notificationTemplates");
 const smsService = require("./services/smsService");
 
 // Define all necessary secrets
@@ -16,21 +17,25 @@ const CONFIG_NOTIFICATIONS_DOC = "config/notifications";
 const CONFIG_EMAIL_DOC = "config/email";
 const RECIPIENTS_COLLECTION = "recipients";
 
-/**
- * A robust utility to ensure a value is an array.
- * @param {*} value The value to check.
- * @returns {Array} The value if it's an array, otherwise an empty array.
- */
-const ensureArray = (value) => (Array.isArray(value) ? value : []);
+function ensureArray(data, source) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (data && typeof data === 'object') {
+    logger.warn(`[Data Consistency] Recipient list from ${source} was an object, not an array. Converting to array.`);
+    return Object.values(data);
+  }
+  return [];
+}
+
 
 exports.notifyStatusChange = onDocumentCreated(
   {
     document: "notifications/{notificationId}",
-    region: "europe-west1",
+    region: "europe-west1", 
     secrets: [sendgridApiKey, vonageApiKey, vonageApiSecret],
   },
   async (event) => {
-    const functionName = "notifyStatusChange";
     const notificationId = event.params.notificationId;
     const notificationRef = db.doc(`notifications/${notificationId}`);
     
@@ -44,80 +49,64 @@ exports.notifyStatusChange = onDocumentCreated(
     try {
       logger.info(`[${notificationId}] Starting notification processing.`);
       const notification = event.data.data();
-
       const deviceId = notification.deviceId || notification.deviceUUID;
 
       if (!notification || !deviceId) {
         throw new Error("Notification document is empty or missing a valid device ID (checked for deviceId and deviceUUID).");
       }
 
-      // --- 1. Fetch Configuration and Recipients ---
       const [configSnap, deviceRecipientsSnap, emailConfigSnap] = await Promise.all([
         db.doc(CONFIG_NOTIFICATIONS_DOC).get(),
         db.doc(`${RECIPIENTS_COLLECTION}/${deviceId}`).get(),
         db.doc(CONFIG_EMAIL_DOC).get(),
       ]);
 
-      const globalConfig = configSnap.exists ? configSnap.data() : {};
+      const globalConfig = configSnap.exists ? configSnap.data() : { email_enabled: false, sms_enabled: false };
       const deviceRecipients = deviceRecipientsSnap.exists ? deviceRecipientsSnap.data() : {};
       const emailConfig = emailConfigSnap.exists ? emailConfigSnap.data() : {};
-      
-      // --- 2. Determine which channels to send to ---
-      const sendEmail = notification.channels?.email ?? (notification.sendEmail ?? true);
-      const sendSms = notification.channels?.sms ?? (notification.sendSms ?? true);
 
-      // --- 3. Initialize Services ---
-      const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
-      if (globalConfig.email_enabled && sendEmail) {
-        sgMail.setApiKey(isEmulator ? process.env.SENDGRID_API_KEY : sendgridApiKey.value());
-      }
-      if (globalConfig.sms_enabled && sendSms) {
-        smsService.initializeVonage(
-          isEmulator ? process.env.VONAGE_API_KEY : vonageApiKey.value(),
-          isEmulator ? process.env.VONAGE_API_SECRET : vonageApiSecret.value()
-        );
-      }
-      
-      // --- 4. Consolidate and Deduplicate Recipients (ULTRA-DEFENSIVE LOGIC) ---
-      // Use the ensureArray utility to guarantee we always have arrays to spread.
-      const globalEmails = ensureArray(globalConfig.global_recipients?.emails);
-      const deviceEmails = ensureArray(deviceRecipients.emails);
-      const allEmails = [...globalEmails, ...deviceEmails];
-
-      const globalSms = ensureArray(globalConfig.global_recipients?.sms);
-      const deviceSms = ensureArray(deviceRecipients.sms);
-      const allSms = [...globalSms, ...deviceSms];
-      // --- END ULTRA-DEFENSIVE LOGIC ---
+      const allEmails = [
+        ...ensureArray(globalConfig.global_recipients?.emails, 'global config'),
+        ...ensureArray(deviceRecipients.emails, `device ${deviceId}`),
+      ];
+      const allSms = [
+        ...ensureArray(globalConfig.global_recipients?.sms, 'global config'),
+        ...ensureArray(deviceRecipients.sms, `device ${deviceId}`),
+      ];
 
       const uniqueEmailTargets = new Map();
       allEmails.forEach(r => {
-        if (r && r.active && r.address) uniqueEmailTargets.set(r.address.toLowerCase(), r);
+        if (r.active && r.address) uniqueEmailTargets.set(r.address.toLowerCase(), r);
       });
 
       const uniqueSmsTargets = new Map();
       allSms.forEach(r => {
-        if (r && r.active && r.number && r.country_code) {
+        if (r.active && r.number && r.country_code) {
           const fullNumber = `${r.country_code}${r.number}`;
           uniqueSmsTargets.set(fullNumber, { ...r, fullNumber });
         }
       });
       
-      logger.info(`[${notificationId}] Found ${uniqueEmailTargets.size} unique email and ${uniqueSmsTargets.size} unique SMS recipients.`);
+      logger.info(`[${notificationId}] Found ${uniqueEmailTargets.size} unique, active email and ${uniqueSmsTargets.size} unique, active SMS recipients from cloud config.`);
       
-      // --- 5. Prepare and Send Notifications ---
+      const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
       const sendPromises = [];
 
-      // Email Promises
-      if (globalConfig.email_enabled && sendEmail && uniqueEmailTargets.size > 0) {
+      if (globalConfig.email_enabled && uniqueEmailTargets.size > 0) {
+        sgMail.setApiKey(isEmulator ? process.env.SENDGRID_API_KEY : sendgridApiKey.value());
+        
         const fromEmail = emailConfig.from || "leak-detection@automatry.com";
         const fromName = emailConfig.name || "Leak Detection";
         
+        // --- FIX: Generate email content from the smart template function ---
+        const emailContent = renderNotificationHTML(notification);
+
         const emailMsg = {
           from: { email: fromEmail, name: fromName },
           replyTo: { email: emailConfig.reply_to || "no-reply@automatry.com", name: fromName },
-          subject: notification.subject || "Automatry System Alert",
-          text: notification.message || "An alert has been triggered.",
-          html: renderNotificationHTML(notification),
+          subject: emailContent.subject, // Use the generated subject
+          text: notification.message, // Text field is a fallback for clients that don't render HTML
+          html: emailContent.html, // Use the generated HTML
         };
 
         uniqueEmailTargets.forEach(recipient => {
@@ -131,16 +120,20 @@ exports.notifyStatusChange = onDocumentCreated(
         });
       }
 
-      // SMS Promises
-      if (globalConfig.sms_enabled && sendSms && uniqueSmsTargets.size > 0) {
-        const detectionTime = (notification.triggeredAt?.toDate ? notification.triggeredAt.toDate() : new Date()).toLocaleString('en-GB');
-        const smsText = `Leak Alert: A '${notification.type}' event occurred for apartment ${notification.apartment} at ${detectionTime}. Message: ${notification.message}`;
+      if (globalConfig.sms_enabled && uniqueSmsTargets.size > 0) {
+        smsService.initializeVonage(
+          isEmulator ? process.env.VONAGE_API_KEY : vonageApiKey.value(),
+          isEmulator ? process.env.VONAGE_API_SECRET : vonageApiSecret.value()
+        );
+        
+        const smsText = generateSmsText(notification);
         
         uniqueSmsTargets.forEach(recipient => {
             dispatchDetails.sms.processed++;
             sendPromises.push(
-                smsService.sendSms(recipient.fullNumber, smsText, process.env.VONAGE_SENDER_NAME)
-                    .then(response => ({ type: 'sms', status: response.success ? 'fulfilled' : 'rejected', recipient: recipient.fullNumber, data: response }))
+                smsService.sendSms(recipient.fullNumber, smsText, process.env.VONAGE_SENDER_NAME || "Automatry")
+                    .then(response => ({ type: 'sms', status: response.success ? 'fulfilled' : 'rejected', recipient: recipient.fullNumber, data: response, reason: response.error }))
+                    .catch(error => ({ type: 'sms', status: 'rejected', recipient: recipient.fullNumber, reason: error.toString() }))
             );
         });
       }
@@ -148,10 +141,11 @@ exports.notifyStatusChange = onDocumentCreated(
       if (sendPromises.length === 0) {
           logger.warn(`[${notificationId}] No active recipients or channels enabled. Ending process.`);
           dispatchDetails.status = "completed_no_recipients";
+          dispatchDetails.completedAt = new Date();
+          await notificationRef.set({ dispatchDetails }, { merge: true });
           return;
       }
       
-      // --- 6. Await All Sends and Process Results ---
       const results = await Promise.all(sendPromises);
 
       results.forEach(result => {
@@ -170,7 +164,7 @@ exports.notifyStatusChange = onDocumentCreated(
             dispatchDetails.sms.results.push({ recipient, status: 'success', message_id: data.data?.['message-id'], details: data.data });
           } else {
             dispatchDetails.sms.failed++;
-            dispatchDetails.sms.results.push({ recipient, status: 'failed', error: data.error, details: data.data });
+            dispatchDetails.sms.results.push({ recipient, status: 'failed', error: reason, details: data.data });
           }
         }
       });

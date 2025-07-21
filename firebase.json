@@ -15,11 +15,6 @@
       "serviceAccount": "firebase-adminsdk-fbsvc@carrington-leak-detection.iam.gserviceaccount.com"
     }
   ],
-  "apphosting": [
-    {
-      "app": "client"
-    }
-  ],
   "storage": {
     "rules": "storage.rules"
   },
@@ -31,6 +26,9 @@
     "rules": "database.rules.json"
   },
   "emulators": {
+    "auth": {
+      "port": 9099
+    },
     "functions": {
       "port": 5001
     },
@@ -40,8 +38,22 @@
     "storage": {
       "port": 9199
     },
-    "hosting": {
+    "apphosting": {
       "port": 5000
+    },
+    "ui": {
+      "enabled": true
     }
+  },
+  "apphosting": {
+    "backendId": "carrington-leak-backend",
+    "rootDir": "client",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "functions"
+    ]
   }
 }

@@ -49,22 +49,29 @@ export default function SettingsPage() {
         return () => unsubscribe();
     }, []);
     
-    // Fetch all email templates
+    // Fetch all email templates with error handling
     useEffect(() => {
-        const q = query(collection(db, TEMPLATES_COLLECTION_PATH));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const fetchedTemplates = {};
-            querySnapshot.forEach((doc) => {
-                fetchedTemplates[doc.id] = doc.data();
+        let unsubscribe = () => {};
+        try {
+            const q = query(collection(db, TEMPLATES_COLLECTION_PATH));
+            unsubscribe = onSnapshot(q, (querySnapshot) => {
+                const fetchedTemplates = {};
+                querySnapshot.forEach((doc) => {
+                    fetchedTemplates[doc.id] = doc.data();
+                });
+                // Ensure all template types have at least a default object
+                templateTypes.forEach(type => {
+                    if (!fetchedTemplates[type]) {
+                        fetchedTemplates[type] = { subject: "", body: "" };
+                    }
+                });
+                setTemplates(fetchedTemplates);
+                setSaveStatus("");
             });
-            // Ensure all template types have at least a default object
-            templateTypes.forEach(type => {
-                if (!fetchedTemplates[type]) {
-                    fetchedTemplates[type] = { subject: "", body: "" };
-                }
-            });
-            setTemplates(fetchedTemplates);
-        });
+        } catch (error) {
+            console.error("Failed to fetch email templates:", error);
+            setSaveStatus("Error loading email templates: " + error.message);
+        }
         return () => unsubscribe();
     }, []);
 
@@ -165,7 +172,9 @@ export default function SettingsPage() {
                             </button>
                         ))}
                     </div>
-                    {templates[activeTemplateId] && (
+                    {saveStatus && saveStatus.startsWith("Error loading email templates") ? (
+                        <div className={pageStyles.saveStatus} style={{ color: "red" }}>{saveStatus}</div>
+                    ) : templates[activeTemplateId] && (
                         <EmailTemplateEditor
                             key={activeTemplateId}
                             template={templates[activeTemplateId]}
@@ -179,7 +188,9 @@ export default function SettingsPage() {
                     <button className="button" onClick={handleSaveAll} disabled={isSaving}>
                         {isSaving ? "Saving..." : "Save All Settings"}
                     </button>
-                    {saveStatus && <span className={pageStyles.saveStatus}>{saveStatus}</span>}
+                    {saveStatus && !saveStatus.startsWith("Error loading email templates") && (
+                        <span className={pageStyles.saveStatus}>{saveStatus}</span>
+                    )}
                 </div>
             </div>
         </AuthGuard>

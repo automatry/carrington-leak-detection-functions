@@ -39,7 +39,7 @@ exports.ingestLogs = onRequest(defaultHttpOptions, (req, res) => {
 // Use specific options for getProvisionScript
 exports.getProvisionScript = onRequest({
   ...defaultHttpOptions, // Inherit region
-  secrets: ["TAILSCALE_API_KEY", "FIREB_API_KEY"], // Specific secrets
+  secrets: ["TAILSCALE_API_KEY", "DEVICE_UPDATE_TOKEN", "DOCKER_PULLER_KEY"], // Corrected secrets
 }, (req, res) => {
   // Logging handled within the function
   getProvisionScript(req, res);

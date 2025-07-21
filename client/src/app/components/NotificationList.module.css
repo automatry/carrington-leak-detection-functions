@@ -1,67 +1,209 @@
-/* components/NotificationList.module.css */
+/* client/src/app/components/NotificationList.module.css */
 .listContainer {
-    margin-top: 2rem;
-  }
-  
-  .controls {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .selectInput { /* Reuse from DeviceList or create shared style */
-    padding: 0.6rem 0.8rem;
-    border: 1px solid rgb(var(--card-border-rgb));
-    background-color: rgb(var(--card-rgb));
-    color: rgb(var(--foreground-rgb));
-    border-radius: var(--border-radius);
-    font-size: 0.95rem;
-    min-width: 150px;
-  }
-  
-  .table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-    font-size: 0.9rem;
-  }
-  
-  .table th,
-  .table td {
-    padding: 0.75rem 1rem;
-    text-align: left;
-    border-bottom: 1px solid rgb(var(--card-border-rgb));
-  }
-  
-  .table th {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.controlsContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem 1.5rem;
+  padding: 1rem 1.5rem;
+  background-color: rgba(var(--card-rgb), 0.7);
+  border: 1px solid rgb(var(--card-border-rgb));
+  border-radius: var(--border-radius);
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  position: relative; /* For dropdown positioning */
+}
+
+.filterGroup label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgb(var(--secondary-rgb));
+}
+
+.searchInput,
+.dateInput,
+.multiSelect {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgb(var(--card-border-rgb));
+  background-color: rgba(var(--background-rgb), 0.8);
+  color: rgb(var(--foreground-rgb));
+  border-radius: calc(var(--border-radius) / 1.5);
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease;
+}
+
+.searchInput:focus,
+.dateInput:focus {
+  outline: none;
+  border-color: rgb(var(--primary-rgb));
+}
+
+/* Multi-select specific styles */
+.multiSelect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-height: 38px;
+  cursor: pointer;
+  align-items: center;
+}
+.multiSelect .placeholder {
     color: rgb(var(--secondary-rgb));
-    font-weight: 500;
-    background-color: rgba(var(--card-rgb), 0.5);
-  }
-  
-  .table tbody tr:hover {
-    background-color: rgba(var(--card-rgb), 0.7);
-  }
-  
-  .typeBadge {
-    display: inline-block;
-    padding: 0.2rem 0.6rem;
-    border-radius: 0.25rem;
-    font-size: 0.8rem;
-    font-weight: 500;
-    background-color: rgb(var(--secondary-rgb));
-    color: rgb(var(--background-rgb));
-  }
-  
-  /* Add specific colors for badge types */
-  .type-leak-detected { background-color: rgb(var(--error-rgb)); color: white;}
-  .type-leak-cleared { background-color: rgb(var(--success-rgb)); color: white;}
-  .type-offline { background-color: rgb(var(--offline-rgb)); color: white;}
-  .type-online { background-color: rgb(var(--primary-rgb)); color: white;}
-  .type-read-error { background-color: rgb(var(--warning-rgb)); color: rgb(var(--background-rgb));}
-  /* Add more types */
-  
-  .error {
-      color: rgb(var(--error-rgb));
-      margin-top: 1rem;
-  }
+}
+
+.selectedItemBadge {
+  background-color: rgb(var(--primary-rgb));
+  color: #fff;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background-color: rgb(var(--card-rgb));
+  border: 1px solid rgb(var(--primary-rgb));
+  border-radius: var(--border-radius);
+  margin-top: 0.25rem;
+  z-index: 10;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dropdownSearch {
+    padding: 0.6rem 0.8rem;
+    border: none;
+    border-bottom: 1px solid rgb(var(--card-border-rgb));
+    background-color: rgba(var(--background-rgb), 0.8);
+    color: rgb(var(--foreground-rgb));
+    font-size: 0.9rem;
+}
+.dropdownSearch:focus {
+    outline: none;
+}
+
+.dropdownList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+}
+.dropdownList li {
+  padding: 0.6rem 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.dropdownList li:hover {
+  background-color: rgba(var(--primary-rgb), 0.2);
+}
+.dropdownList li input[type="checkbox"] {
+    pointer-events: none; /* Let the li handle the click */
+}
+.noResults {
+  color: rgb(var(--secondary-rgb));
+  font-style: italic;
+  padding: 0.6rem 0.8rem;
+}
+
+/* Table styles */
+.tableWrapper {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  table-layout: fixed;
+}
+
+.table th,
+.table td {
+  padding: 0.8rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid rgb(var(--card-border-rgb));
+  vertical-align: middle;
+}
+
+.table th {
+  color: rgb(var(--secondary-rgb));
+  font-weight: 600;
+  background-color: rgba(var(--card-rgb), 0.5);
+}
+
+.table tbody tr:hover {
+  background-color: rgba(var(--card-rgb), 0.7);
+}
+
+.sortableHeader {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.sortableHeader:hover {
+  color: rgb(var(--foreground-rgb));
+}
+
+/* Column Widths */
+.table th:nth-child(1) { width: 15%; }
+.table th:nth-child(2) { width: 10%; }
+.table th:nth-child(3) { width: 15%; }
+.table th:nth-child(4) { width: 60%; }
+
+.timestampCell {
+  white-space: nowrap;
+}
+
+.messageCell {
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Updated Type Badge styles (less intense) */
+.typeBadge {
+  display: inline-block;
+  padding: 0.3rem 0.7rem;
+  border-radius: 1rem; /* Pill shape */
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  text-transform: capitalize;
+  text-align: center;
+  min-width: 80px;
+}
+
+.type-leak-detected { background-color: rgba(var(--error-rgb), 0.15); color: rgb(var(--error-rgb)); border-color: rgba(var(--error-rgb), 0.4); }
+.type-leak-cleared { background-color: rgba(var(--success-rgb), 0.15); color: rgb(var(--success-rgb)); border-color: rgba(var(--success-rgb), 0.4); }
+.type-offline { background-color: rgba(var(--offline-rgb), 0.2); color: rgb(var(--offline-rgb)); border-color: rgba(var(--offline-rgb), 0.5); }
+.type-online { background-color: rgba(var(--primary-rgb), 0.15); color: rgb(var(--primary-rgb)); border-color: rgba(var(--primary-rgb), 0.4); }
+.type-read-error, .type-unknown, .type-manual-test { background-color: rgba(var(--warning-rgb), 0.15); color: rgb(var(--warning-rgb)); border-color: rgba(var(--warning-rgb), 0.4); }
+
+.error {
+    color: rgb(var(--error-rgb));
+    margin-top: 1rem;
+}
+
+.noResults {
+    text-align: center;
+    padding: 2rem;
+    color: rgb(var(--secondary-rgb));
+    font-style: italic;
+}

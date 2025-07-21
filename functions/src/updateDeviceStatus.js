@@ -1,6 +1,6 @@
 // functions/src/updateDeviceStatus.js
 const { FieldValue } = require("firebase-admin/firestore");
-const { db } = require("../firebaseClient");
+const { db } = require("../firebaseAdmin");
 const logger = require("firebase-functions/logger");
 
 // Use a centralized config for this token

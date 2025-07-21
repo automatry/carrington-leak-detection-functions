@@ -2,7 +2,7 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const crypto = require("crypto");
-const { db } = require("../firebaseClient");
+const { db } = require("../firebaseAdmin");
 const { FieldValue } = require("firebase-admin/firestore");
 
 /**

@@ -4,7 +4,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 const fetch = require("node-fetch");
-const { db } = require("../firebaseClient");
+const { db } = require("../firebaseAdmin");
 const { FieldValue } = require("firebase-admin/firestore");
 
 // Using the centralized config module is the cleanest approach.

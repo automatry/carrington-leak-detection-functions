@@ -3,14 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "firebase emulators:start --only functions",
-    "build-and-copy": "npm run build --workspace=client",
-    "deploy:functions": "npm run build-and-copy && firebase deploy --only functions",
-    "deploy:app": "npm run build-and-copy && firebase deploy --only apphosting",
-    "deploy:all": "npm run build-and-copy && firebase deploy"
-  },
-  "workspaces": [
-    "client",
-    "functions"
-  ]
+    "dev:client": "npm run dev --workspace=client",
+    "dev:emulators": "firebase emulators:start --import=./firebase-emulator-data --export-on-exit",
+    "build:client": "npm run build --workspace=client",
+    "deploy": "firebase deploy",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:app": "npm run build:client && firebase deploy --only hosting,apphosting"
+  }
 }
